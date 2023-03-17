@@ -1,1 +1,1 @@
-from .annular import AnnularPassage
+from .passage import FlowPassage

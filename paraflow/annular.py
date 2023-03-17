@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Tuple
 import numpy as np
 from thermo import EquilibriumState
-from paraflow.flow_passage import FlowPassage
 
 
 def get_hub_shroud_radii(

@@ -22,7 +22,7 @@ def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
 @dataclass
 class FlowPassage:
 
-    throat_radius: float
+    inlet_radius: float
     "radius of throat"
 
     area_ratio: float
@@ -31,10 +31,10 @@ class FlowPassage:
     axial_length: float
     "length of base nozzle in axial direction"
 
-    mid_angles: Optional[List[float]] = None
+    contour_angles: Optional[List[float]] = None
     "angle of outlet"
 
-    mid_props: Optional[List[float]] = None
+    contour_props: Optional[List[float]] = None
     "proportions of points along"
 
     inlet_length: float = 0.0
@@ -49,64 +49,62 @@ class FlowPassage:
 
     def __post_init__(self):
 
-        self.exit_radius = self.area_ratio*self.throat_radius
-        self.exit_angle = np.arctan((self.exit_radius - self.throat_radius)/self.axial_length)
+        self.exit_radius = self.area_ratio*self.inlet_radius
+        self.exit_angle = np.arctan((self.exit_radius - self.inlet_radius)/self.axial_length)
 
-        if self.mid_angles is None:
-            self.mid_angles = [self.exit_angle]
+        if self.contour_angles is None:
+            self.contour_angles = [self.exit_angle, self.exit_angle]
 
-        if self.mid_props is None:
-            self.mid_props = [0.5]
+        if self.contour_props is None:
+            self.contour_props = [0,0]
 
-        self.mid_length = np.asarray(self.mid_props)*self.axial_length
+        self.countour_lengths = np.asarray(self.contour_props)*self.axial_length
         mid_ctrl_pnts = np.array(
             [
-                self.mid_length, 
-                self.throat_radius + self.mid_length*np.tan(self.mid_angles)
+                self.countour_lengths, 
+                self.inlet_radius + self.countour_lengths*np.tan(self.contour_angles)
             ]
         ).T
 
-        self.shroud_ctrl_pnts = np.array(
+        self.ctrl_pnts = np.array(
             [
-                [0.0, self.throat_radius],
+                [0.0, self.inlet_radius],
                 *mid_ctrl_pnts,
                 [self.axial_length, self.exit_radius]
             ]
         )
 
-        self.shroud_bspline = get_bspline(self.shroud_ctrl_pnts, self.degree)
+        self.shroud_bspline = get_bspline(self.ctrl_pnts, self.degree)
 
 
-    def visualize(self):
+    def visualize(self, title: Optional[str] = None, include_ctrl_pnts=False):
         fig = go.Figure(
-            layout=go.Layout(title=go.layout.Title(text="Nozzle Cross Section"))
+            layout=go.Layout(title=go.layout.Title(text=title or "Flow Passage"))
         )
 
         shroud_pnts = self.shroud_bspline(np.linspace(0, 1, 100))
 
-        fig.add_trace(go.Scatter(
-            x=self.shroud_ctrl_pnts[:, 0],
-            y=self.shroud_ctrl_pnts[:, 1],
-            name=f"Control Points"
-        ))
+        if include_ctrl_pnts:
+            fig.add_trace(go.Scatter(
+                x=self.ctrl_pnts[:, 0],
+                y=self.ctrl_pnts[:, 1],
+                name=f"Control Points"
+            ))
 
         fig.add_trace(go.Scatter(
             x=shroud_pnts[:, 0],
             y=shroud_pnts[:, 1],
-            name=f"Shroud"
+            name=f"Shroud Top"
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=shroud_pnts[:, 0],
+            y=-shroud_pnts[:, 1],
+            name=f"Shroud Bottom"
         ))
 
         fig.layout.yaxis.scaleanchor = "x"  # type: ignore
         fig.show()
 
 
-passage = FlowPassage(
-    throat_radius=0.1,
-    area_ratio=3.0,
-    axial_length=1,
-    mid_props=[0.25, 0.5, 0.75],
-    mid_angles=np.radians([-15.0, 15.0, 15.0]).tolist()
-)
-
-passage.visualize()
 # %%
