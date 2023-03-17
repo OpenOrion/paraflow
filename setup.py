@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(
-   name='parafoil',
+   name='paraflow',
    version='1.0',
    description='the open source parametric airfoil generator',
    author='Afshawn Lotfi',
