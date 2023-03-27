@@ -1,12 +1,12 @@
-# %%
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Optional
 import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
 from scipy.interpolate import BSpline
 import numpy as np
 import numpy.typing as npt
+from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField, visualize_mesh
 
 def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
     "get a bspline with clamped knots"
@@ -43,11 +43,15 @@ class FlowPassage:
     outlet_length: float = 0.0
     "length of outlet"
 
+    num_shroud_pnts: int = 50
+    "number of points along shroud"
+
     degree: int = 3
     "degree of bspline"
     
 
     def __post_init__(self):
+        self.symetry_line = np.array([[0.0, 0.0], [0.0, self.axial_length]])
 
         self.exit_radius = self.area_ratio*self.inlet_radius
         self.exit_angle = np.arctan((self.exit_radius - self.inlet_radius)/self.axial_length)
@@ -75,14 +79,44 @@ class FlowPassage:
         )
 
         self.shroud_bspline = get_bspline(self.ctrl_pnts, self.degree)
+        self.shroud_line = self.shroud_bspline(np.linspace(0, 1, self.num_shroud_pnts))
+
+
+    def get_mesh(self, mesh_size=0.01):
+        with Geometry() as geo:
+            curve_loop = CurveLoop.from_coords(
+                [
+                    ("BSpline", self.ctrl_pnts),
+                    np.array([[self.axial_length, 0.0], [0.0, 0.0]])
+                ],
+                mesh_size=mesh_size,
+                labels=["wall", "outflow", "symmetry", "inflow"],
+                fields=[
+                    TransfiniteCurveField(
+                        node_counts={"wall": 20, "inflow": 100, "symmetry": 20, "outflow": 100}
+                    )
+                ]
+            )
+            
+            surface = PlaneSurface(
+                outlines=[curve_loop], 
+                is_quad_mesh=True, 
+                fields=[
+                    TransfiniteSurfaceField(corners=[*curve_loop.get_points("wall"), *curve_loop.get_points("symmetry")])
+                ],
+            )
+
+            mesh = geo.generate(surface)
+            geo.write("test.geo_unrolled")
+
+            visualize_mesh(mesh)
+        return mesh
 
 
     def visualize(self, title: Optional[str] = None, include_ctrl_pnts=False):
         fig = go.Figure(
             layout=go.Layout(title=go.layout.Title(text=title or "Flow Passage"))
         )
-
-        shroud_pnts = self.shroud_bspline(np.linspace(0, 1, 100))
 
         if include_ctrl_pnts:
             fig.add_trace(go.Scatter(
@@ -92,14 +126,14 @@ class FlowPassage:
             ))
 
         fig.add_trace(go.Scatter(
-            x=shroud_pnts[:, 0],
-            y=shroud_pnts[:, 1],
+            x=self.shroud_line[:, 0],
+            y=self.shroud_line[:, 1],
             name=f"Shroud Top"
         ))
 
         fig.add_trace(go.Scatter(
-            x=shroud_pnts[:, 0],
-            y=-shroud_pnts[:, 1],
+            x=self.shroud_line[:, 0],
+            y=-self.shroud_line[:, 1],
             name=f"Shroud Bottom"
         ))
 
