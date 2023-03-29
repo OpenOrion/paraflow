@@ -62,18 +62,18 @@ class FlowPassage:
         if self.contour_props is None:
             self.contour_props = [0,0]
 
-        self.countour_lengths = np.asarray(self.contour_props)*self.axial_length
-        mid_ctrl_pnts = np.array(
+        self.contour_lengths = np.asarray(self.contour_props)*self.axial_length
+        contour_ctrl_pnts = np.array(
             [
-                self.countour_lengths, 
-                self.inlet_radius + self.countour_lengths*np.tan(self.contour_angles)
+                self.contour_lengths, 
+                self.inlet_radius + self.contour_lengths*np.tan(self.contour_angles)
             ]
         ).T
 
         self.ctrl_pnts = np.array(
             [
                 [0.0, self.inlet_radius],
-                *mid_ctrl_pnts,
+                *contour_ctrl_pnts,
                 [self.axial_length, self.exit_radius]
             ]
         )
@@ -93,7 +93,8 @@ class FlowPassage:
                 labels=["wall", "outflow", "symmetry", "inflow"],
                 fields=[
                     TransfiniteCurveField(
-                        node_counts={"wall": 20, "inflow": 100, "symmetry": 20, "outflow": 100}
+                        node_counts={"wall": 100, "inflow": 100, "symmetry": 100, "outflow": 100},
+                        coefs={"wall": 1.0, "inflow": 1/1.1, "symmetry": 1.0, "outflow": 1.1}
                     )
                 ]
             )
