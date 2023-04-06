@@ -1,32 +1,50 @@
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Dict
+import numpy as np
 import pysu2
 from mpi4py import MPI
+from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
-from paraflow.passages.common import Passage, PassageFluid
+from paraflow.flow_station import FlowStation
+from paraflow.passages.common import Passage
 
 CONFIG_FILE_NAME = "config.cfg"
 
 
+@dataclass
+class TargetState:
+    pressure: float
+    temperature: float
+    sound_speed: float
+    velocity_x: float
+    velocity_y: float
+
+    @cached_property
+    def mach_number(self) -> float:
+        velocity = np.sqrt(self.velocity_x**2 + self.velocity_y**2)
+        return velocity / self.sound_speed
+
+
 def setup_simulation(
+    mesh: Mesh,
+    config: Dict,
     working_directory: str,
-    passage: Passage,
-    fluid: PassageFluid
 ):
-    config = passage.get_config(fluid)
-    mesh = passage.get_mesh()
     with open(f"{working_directory}/{CONFIG_FILE_NAME}", "w") as f:
         for key, value in config.items():
-            if key == "MESH_FILENAME":
-                value = f"{working_directory}/{value}"
             f.write(f"{key}= {value}\n")
-        export_to_su2(mesh, f"{working_directory}/{config['MESH_FILENAME']}")
+        export_to_su2(mesh, config['MESH_FILENAME'])
 
 
 def run_simulation(
-    working_directory: str,
     passage: Passage,
-    fluid: PassageFluid
+    inflow: FlowStation,
+    working_directory: str,
 ):
-    setup_simulation(working_directory, passage, fluid)
+    config = passage.get_config(inflow, working_directory)
+    mesh = passage.get_mesh()
+    setup_simulation(mesh, config, working_directory)
 
     # Import mpi4py for parallel run
     comm = MPI.COMM_WORLD
@@ -35,37 +53,19 @@ def run_simulation(
     # Initialize the corresponding driver of SU2, this includes solver preprocessing
     SU2Driver = pysu2.CSinglezoneDriver(f"{working_directory}/{CONFIG_FILE_NAME}", 1, comm)
 
-    MarkerID = None
-    MarkerName = 'wall'       # Specified by the user
-
     # Get all the boundary tags
     MarkerList = SU2Driver.GetMarkerTags()
 
     # Get all the markers defined on this rank and their associated indices.
     allMarkerIDs = SU2Driver.GetMarkerIndices()
 
-    # Check if the specified marker exists and if it belongs to this rank.
-    if MarkerName in MarkerList and MarkerName in allMarkerIDs.keys():
-        MarkerID = allMarkerIDs[MarkerName]
-
-    # Number of vertices on the specified marker (per rank)
-    nVertex_Marker = 0  # total number of vertices (physical + halo)
-
-    if MarkerID != None:
-        nVertex_Marker = SU2Driver.GetNumberMarkerNodes(MarkerID)
-    print(nVertex_Marker)
-    # primitiveIndices = SU2Driver.GetPrimitiveIndices() # maps primitive names to their indices.
-    # temperatureIndex = primitiveIndices["TEMPERATURE"]
-    # primitives = SU2Driver.Primitives()
-
-    # for iVertex in range(nVertex_Marker):
-    #   # SU2Driver.SetMarkerCustomDisplacement(MovingMarkerID, int(iVertex), value)
-    #   # print(primitives)
-    #   # fxyz = SU2Driver.GetMarkerFlowLoad(MarkerID, iVertex)
-    #   # print(fxyz)
-    #   x, y = SU2Driver.InitialCoordinates().Get(iVertex)
-    #   print(x,y)
-    #   print(primitives(iVertex, temperatureIndex))
+    primitiveIndices = SU2Driver.GetPrimitiveIndices()  # maps primitive names to their indices.
+    temperatureIndex = primitiveIndices["TEMPERATURE"]
+    pressureIndex = primitiveIndices["PRESSURE"]
+    soundSpeedIndex = primitiveIndices["SOUND_SPEED"]
+    velocityXIndex = primitiveIndices["VELOCITY_X"]
+    velocityYIndex = primitiveIndices["VELOCITY_Y"]
+    primitives = SU2Driver.Primitives()
 
     # Time loop is defined in Python so that we have acces to SU2 functionalities at each time step
     comm.Barrier()
@@ -86,7 +86,25 @@ def run_simulation(
     SU2Driver.Monitor(0)
 
     # Output the solution to file
-    SU2Driver.Output(0)
+    # SU2Driver.Output(0)
+    target_values: Dict[str, TargetState] = {}
+    for marker_name, target in mesh.target_points.items():
+        marker_id = allMarkerIDs[marker_name]
+        nVertex_Marker = SU2Driver.GetNumberMarkerNodes(marker_id)
+        for iVertex in range(nVertex_Marker):
+            marker_coords = np.array(SU2Driver.MarkerCoordinates(marker_id).Get(iVertex), dtype=np.float64)
+            for target_key, target_name in target.items():
+                target_name = target[target_key]
+                target_coords = mesh.points[target_key]
+                if np.allclose(target_coords[:2], marker_coords):
+                    target_values[target_name] = TargetState(
+                        pressure=primitives(iVertex, pressureIndex),
+                        temperature=primitives(iVertex, temperatureIndex),
+                        sound_speed=primitives(iVertex, soundSpeedIndex),
+                        velocity_x=primitives(iVertex, velocityXIndex),
+                        velocity_y=primitives(iVertex, velocityYIndex),
+                    )
 
     # Finalize the solver and exit cleanly
     SU2Driver.Finalize()
+    return target_values

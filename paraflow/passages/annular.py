@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 import plotly.graph_objects as go
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
-from paraflow.passages.common import Passage, PassageFluid
+from paraflow.flow_station import FlowStation
+from paraflow.passages.common import Passage
 from paraflow.passages.symmetric import SymmetricPassage
 
 
@@ -84,7 +85,7 @@ class AnnularPassage(Passage):
         fig.show()
 
     @staticmethod
-    def get_config(fluid: PassageFluid):
-        config = SymmetricPassage.get_config(fluid)
+    def get_config(inflow: FlowStation, working_directory: str):
+        config = SymmetricPassage.get_config(inflow, working_directory)
         del config["MARKER_SYM"]
         return config

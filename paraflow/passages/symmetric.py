@@ -7,10 +7,8 @@ from scipy.interpolate import BSpline
 import numpy as np
 import numpy.typing as npt
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
-from chemicals import R, mixing_simple
-from fluids.compressible import T_critical_flow, P_critical_flow
-from thermo import EquilibriumState
-from paraflow.passages.common import Passage, PassageFluid
+from paraflow.flow_station import FlowStation
+from paraflow.passages.common import Passage
 
 def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
     "get a bspline with clamped knots"
@@ -123,19 +121,12 @@ class SymmetricPassage(Passage):
         fig.show()
 
     @staticmethod
-    def get_config(fluid: PassageFluid):        
-        # gamma = cast(float, fluid.inlet_total_state.Cp_Cv_ratio())  # type: ignore
-        # molar_weight = cast(float, mixing_simple(fluid.inlet_total_state.zs, inlet_total_state.constants.MWs))                                                    # type: ignore
-        # specific_gas_constant = R * 1000 / molar_weight
-        # inlet_static_pressure = fluid.inlet_total_pressure/(1+((gamma-1)/2)*inlet_mach_number**2)**(gamma/(gamma-1))
-        # critical_temperature = T_critical_flow(fluid.inlet_total_temperature, gamma)
-        # critical_pressure = P_critical_flow(fluid.inlet_total_pressure, gamma)
-
-        gamma = 1.01767
-        specific_gas_constant = 35.17
-        inlet_static_pressure = 200000.0
-        critical_temperature = 565.3609
-        critical_pressure = 1437500
+    def get_config(inflow: FlowStation, working_directory: str):        
+        # gamma = 1.01767
+        # specific_gas_constant = 35.17
+        # inlet_static_pressure = 200000.0
+        # critical_temperature = 565.3609
+        # critical_pressure = 1437500
 
         return {
             "SOLVER": "RANS",
@@ -143,27 +134,27 @@ class SymmetricPassage(Passage):
             "MATH_PROBLEM": "DIRECT",
             "RESTART_SOL": "NO",
             "SYSTEM_MEASUREMENTS": "SI",
-            "MACH_NUMBER": fluid.inlet_mach_number,
+            "MACH_NUMBER": inflow.mach_number,
             "AOA": 0.0,
             "SIDESLIP_ANGLE": 0.0,
             "INIT_OPTION": "TD_CONDITIONS",
             "FREESTREAM_OPTION": "TEMPERATURE_FS",
-            "FREESTREAM_PRESSURE": fluid.inlet_total_pressure,
-            "FREESTREAM_TEMPERATURE": fluid.inlet_total_temperature,
+            "FREESTREAM_PRESSURE": inflow.total_pressure,
+            "FREESTREAM_TEMPERATURE": inflow.total_temperature,
             "REF_DIMENSIONALIZATION": "DIMENSIONAL",
             "FLUID_MODEL": "PR_GAS",
-            "GAMMA_VALUE": gamma,
-            "GAS_CONSTANT": specific_gas_constant,
-            "CRITICAL_TEMPERATURE": critical_temperature,
-            "CRITICAL_PRESSURE": critical_pressure,
-            "ACENTRIC_FACTOR": fluid.inlet_total_state.pseudo_omega(),
+            "GAMMA_VALUE": inflow.gamma,
+            "GAS_CONSTANT": inflow.specific_gas_constant,
+            "CRITICAL_TEMPERATURE": inflow.critical_temperature,
+            "CRITICAL_PRESSURE": inflow.critical_pressure,
+            "ACENTRIC_FACTOR": inflow.total_state.pseudo_omega(),
             "VISCOSITY_MODEL": "CONSTANT_VISCOSITY",
-            "MU_CONSTANT": fluid.inlet_total_state.mu(),                                  # type: ignore
+            "MU_CONSTANT": inflow.total_state.mu(),                                  # type: ignore
             "CONDUCTIVITY_MODEL": "CONSTANT_CONDUCTIVITY",
-            "THERMAL_CONDUCTIVITY_CONSTANT": fluid.inlet_total_state.k(),                 # type: ignore
+            "THERMAL_CONDUCTIVITY_CONSTANT": inflow.total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
             "MARKER_SYM": "symmetry",
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {fluid.inlet_total_pressure}, {fluid.inlet_total_temperature}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {inlet_static_pressure}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_pressure}, {inflow.total_temperature}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {inflow.static_pressure}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",
@@ -187,16 +178,16 @@ class SymmetricPassage(Passage):
             "ITER": 100,
             "CONV_RESIDUAL_MINVAL": -24,
             "CONV_STARTITER": 10,
-            "MESH_FILENAME": "passage.su2",
+            "MESH_FILENAME": f"{working_directory}/passage.su2",
             "MESH_FORMAT": "SU2",
-            "MESH_OUT_FILENAME": "mesh_out.su2",
-            "SOLUTION_FILENAME": "solution_flow.dat",
-            "SOLUTION_ADJ_FILENAME": "solution_adj.dat",
+            "MESH_OUT_FILENAME": f"{working_directory}/mesh_out.su2",
+            "SOLUTION_FILENAME": f"{working_directory}/solution_flow.dat",
+            "SOLUTION_ADJ_FILENAME": f"{working_directory}/solution_adj.dat",
             "TABULAR_FORMAT": "CSV",
-            "CONV_FILENAME": "history",
-            "RESTART_FILENAME": "restart_flow.dat",
-            "VOLUME_FILENAME": "flow",
-            "SURFACE_FILENAME": "surface_flow",
+            "CONV_FILENAME": f"{working_directory}/history",
+            "RESTART_FILENAME": f"{working_directory}/restart_flow.dat",
+            "VOLUME_FILENAME": f"{working_directory}/flow",
+            "SURFACE_FILENAME": f"{working_directory}/surface_flow",
             "OUTPUT_WRT_FREQ": 1000,
             "SCREEN_OUTPUT": "(INNER_ITER, RMS_DENSITY, RMS_TKE, RMS_DISSIPATION, LIFT, DRAG)",
         }
