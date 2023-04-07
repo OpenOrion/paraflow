@@ -55,8 +55,6 @@ class FlowStation:
         self.specific_heat_const_pressure = self.total_state.Cp() # type: ignore
         self.molar_weight = cast(float, mixing_simple(self.total_state.zs, self.total_state.constants.MWs))     # type: ignore
         self.specific_gas_constant = R * 1000 / self.molar_weight
-        self.critical_temperature = T_critical_flow(self.total_temperature, self.gamma)
-        self.critical_pressure = P_critical_flow(self.total_pressure, self.gamma)
 
         if self.absolute_angle is None:
             velocity = self.meridonal_velocity
@@ -65,6 +63,7 @@ class FlowStation:
 
         self.static_temperature = self.total_temperature - (velocity**2)/(2*self.specific_heat_const_pressure)
         self.static_pressure = self.total_pressure*(self.static_temperature/self.total_temperature)**(self.gamma/(self.gamma - 1))
+
 
     @cached_property
     def static_state(self) -> EquilibriumState:

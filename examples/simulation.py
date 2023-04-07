@@ -1,11 +1,17 @@
 # %%
 from pathlib import Path
 import sys
+
 project_path = Path(__file__).parent.resolve().parents[0]
 sys.path.append(f"{project_path}")
 
-import numpy as np
+# %%
 from paraflow import SymmetricPassage, run_simulation, FlowStation
+from paraflow.optimize import OptimizationSpecification, optimize
+
+from ezmesh import visualize_mesh
+import numpy as np
+
 
 passage = SymmetricPassage(
     inlet_radius=0.2,
@@ -23,4 +29,20 @@ inflow = FlowStation(
     state_type="gas"
 )
 
-run_simulation(passage, inflow, "/workspaces/paraflow/simulation")
+# passage.visualize()
+
+
+# run_simulation(passage, inflow, "/workspaces/paraflow/simulation")
+
+
+spec = OptimizationSpecification(
+    inflow=inflow,
+    inlet_radius=0.2,
+    num_ctrl_pts=3,
+    objectives=[("mach", "max")],
+    area_ratio=2
+)
+
+optimize(spec)
+
+# %%

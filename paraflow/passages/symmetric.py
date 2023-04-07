@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, cast
 import numpy as np
 import numpy.typing as npt
@@ -9,6 +9,7 @@ import numpy.typing as npt
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_station import FlowStation
 from paraflow.passages.common import Passage
+
 
 def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
     "get a bspline with clamped knots"
@@ -30,10 +31,10 @@ class SymmetricPassage(Passage):
     inlet_radius: float
     "radius of contour inlet"
 
-    contour_angles: Optional[List[float]] = None
+    contour_angles: List[float] = field(default_factory=list)
     "angle of outlet"
 
-    contour_props: Optional[List[float]] = None
+    contour_props: List[float] = field(default_factory=list)
     "proportions of points along"
 
     area_ratio: Optional[float] = None
@@ -51,10 +52,14 @@ class SymmetricPassage(Passage):
             self.exit_radius = np.tan(self.exit_angle)*self.axial_length + self.inlet_radius
             self.area_ratio = self.exit_radius/self.inlet_radius
 
-        if self.contour_props is None:
-            self.contour_props = [0, 0]
-        if self.contour_angles is None:
+        if self.contour_props and self.contour_angles:
+            assert len(self.contour_props) == len(self.contour_angles), "must specify same number of contour props and angles"
+            if len(self.contour_angles) == 1:
+                self.contour_angles = [self.contour_angles[0], self.contour_angles[0]]
+                self.contour_props = [self.contour_props[0], self.contour_props[0]]
+        else:
             self.contour_angles = [self.exit_angle, self.exit_angle]
+            self.contour_props = [1.0, 1.0]
 
         contour_lengths = np.asarray(self.contour_props)*self.axial_length
         contour_ctrl_pnts = np.array(
@@ -121,13 +126,8 @@ class SymmetricPassage(Passage):
         fig.show()
 
     @staticmethod
-    def get_config(inflow: FlowStation, working_directory: str):        
-        # gamma = 1.01767
-        # specific_gas_constant = 35.17
-        # inlet_static_pressure = 200000.0
-        # critical_temperature = 565.3609
-        # critical_pressure = 1437500
-
+    def get_config(inflow: FlowStation, working_directory: str):
+        outflow_static_pressure = 200000.0
         return {
             "SOLVER": "RANS",
             "KIND_TURB_MODEL": "SST",
@@ -145,8 +145,8 @@ class SymmetricPassage(Passage):
             "FLUID_MODEL": "PR_GAS",
             "GAMMA_VALUE": inflow.gamma,
             "GAS_CONSTANT": inflow.specific_gas_constant,
-            "CRITICAL_TEMPERATURE": inflow.critical_temperature,
-            "CRITICAL_PRESSURE": inflow.critical_pressure,
+            "CRITICAL_TEMPERATURE": inflow.total_state.pseudo_Tc(),
+            "CRITICAL_PRESSURE": inflow.total_state.pseudo_Pc(),
             "ACENTRIC_FACTOR": inflow.total_state.pseudo_omega(),
             "VISCOSITY_MODEL": "CONSTANT_VISCOSITY",
             "MU_CONSTANT": inflow.total_state.mu(),                                  # type: ignore
@@ -154,7 +154,7 @@ class SymmetricPassage(Passage):
             "THERMAL_CONDUCTIVITY_CONSTANT": inflow.total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
             "MARKER_SYM": "symmetry",
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_pressure}, {inflow.total_temperature}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {inflow.static_pressure}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_pressure}, {inflow.total_temperature}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {outflow_static_pressure}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",

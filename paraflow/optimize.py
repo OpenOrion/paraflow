@@ -1,71 +1,77 @@
+# %%
 from dataclasses import dataclass
-from typing import Iterable, List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 import numpy as np
-from pymoo.optimize import minimize
-from pymoo.core.problem import ElementwiseProblem
-from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.factory import get_sampling, get_crossover, get_mutation
-from pymoo.factory import get_termination
 from paraflow.flow_station import FlowStation
 import numpy as np
 from paraflow import SymmetricPassage, run_simulation, FlowStation
+from pymoo.core.problem import ElementwiseProblem
+
+from pymoo.core.problem import Problem
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.optimize import minimize
 
 
 
 MaxOrMin = Literal["max", "min"]
-GreaterOrLess = Literal["greater", "less", "equal"]
-PositiveOrNegative = Literal["positive", "negative"]
 
-
-    # contour_props=[0.25, 0.25, 0.35, 0.5, 0.5, 0.75],
-    # contour_angles=np.radians([-15.0, -15.0, 0.0, 3, 5.0, 15.0]).tolist()
 
 @dataclass
 class OptimizationSpecification:
     inflow: FlowStation
     inlet_radius: float
     num_ctrl_pts: int
-    objectives: List[Tuple[str, MaxOrMin]]
+    objectives: List[Tuple[Literal["mach"], MaxOrMin]]
     area_ratio: Optional[float] = None
+
 
 class PassageOptimizationProblem(ElementwiseProblem):
     def __init__(self, spec: OptimizationSpecification):
         self.spec = spec
 
+        prop_lower_bound = np.zeros(self.spec.num_ctrl_pts)
+        prop_upper_bound = np.ones(self.spec.num_ctrl_pts)
 
+        angles_lower_bound = np.full(self.spec.num_ctrl_pts, -np.pi/2)
+        angles_upper_bound = np.full(self.spec.num_ctrl_pts, 2*np.pi)
+
+    # contour_props=[0.25, 0.25, 0.35, 0.5, 0.5, 0.75],
+    # contour_angles=np.radians([-15.0, -15.0, 0.0, 3, 5.0, 15.0]).tolist()
 
         super().__init__(
             n_var=self.spec.num_ctrl_pts,
             n_obj=len(self.spec.objectives),
-            n_constr=29,
-            xl=[
-                
-            ],
-            xu=[
-            
-            ]
+            n_ieq_constr=0,
+            # xl=0,
+            # xu=1
+            xl=np.concatenate([prop_lower_bound, angles_lower_bound]),
+            xu=np.concatenate([prop_upper_bound, angles_upper_bound]),
         )
 
     def _evaluate(self, x, out, *args, **kwargs):
-        passage = SymmetricPassage(
-            inlet_radius=self.spec.inlet_radius,
-            area_ratio=self.spec.area_ratio,
-            axial_length=1,
-            contour_props=[0.2, 0.5, 0.75],
-            contour_angles=np.radians([-20, 15.0, 15.0]).tolist()
-        )
+        print(x)
+        # passage = SymmetricPassage(
+        #     inlet_radius=self.spec.inlet_radius,
+        #     area_ratio=self.spec.area_ratio,
+        #     axial_length=1,
+        #     contour_props=x[:, :self.spec.num_ctrl_pts].tolist(),
+        #     contour_angles=x[:, self.spec.num_ctrl_pts:].tolist(),
+        # )
 
-        sim_results = run_simulation(passage, self.spec.inflow, "/workspaces/paraflow/simulation")
-        objectives = []
-        for obj, direction in self.spec.objectives:
-            sign = -1 if direction == "max" else 1
-            if obj == "mach":
-                obj_val = sim_results["mid_outflow"].mach_number
-            else:
-                raise ValueError(f"Unknown objective {obj}")
-            objectives.append(sign * obj_val)
+        # sim_results = run_simulation(passage, self.spec.inflow, "/workspaces/paraflow/simulation")
+        # objectives = []
+        # for obj, direction in self.spec.objectives:
+        #     sign = -1 if direction == "max" else 1
+        #     if obj == "mach":
+        #         obj_val = sim_results["mid_outflow"].mach_number
+        #     else:
+        #         raise ValueError(f"Unknown objective {obj}")
+        #     objectives.append(sign * obj_val)
 
-        out["F"] = np.column_stack(objectives)
+        out["F"] = np.column_stack([0])
         out["G"] = np.column_stack([])
 
 
@@ -74,18 +80,17 @@ def optimize(spec: OptimizationSpecification):
     algorithm = NSGA2(
         pop_size=100,
         n_offsprings=10,
-        sampling=get_sampling("real_random"),
-        crossover=get_crossover("real_sbx", prob=0.9, eta=15),
-        mutation=get_mutation("real_pm", eta=20),
+        sampling=FloatRandomSampling(),
+        crossover=SBX(prob=1.0, eta=3, vtype=float),
+        mutation=PM(prob=1.0, eta=3, vtype=float),
         eliminate_duplicates=True
     )
 
-    termination = get_termination("n_gen", 100)
 
     res = minimize(
         problem,
         algorithm,
-        termination,
+        termination=('n_gen', 40),
         seed=1,
         save_history=True,
         verbose=True

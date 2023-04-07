@@ -85,8 +85,6 @@ def run_simulation(
     # Monitor the solver and output solution to file if required
     SU2Driver.Monitor(0)
 
-    # Output the solution to file
-    # SU2Driver.Output(0)
     target_values: Dict[str, TargetState] = {}
     for marker_name, target in mesh.target_points.items():
         marker_id = allMarkerIDs[marker_name]
@@ -104,6 +102,10 @@ def run_simulation(
                         velocity_x=primitives(iVertex, velocityXIndex),
                         velocity_y=primitives(iVertex, velocityYIndex),
                     )
+
+    # Output the solution to file
+    SU2Driver.Output(0)
+
 
     # Finalize the solver and exit cleanly
     SU2Driver.Finalize()
