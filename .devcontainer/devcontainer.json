@@ -18,5 +18,7 @@
 		"ms-python.vscode-pylance",
 		"eamodio.gitlens"
 	],
-	"remoteUser": "vscode"
+	"remoteUser": "vscode",
+	"workspaceFolder": "/workspace",
+	"workspaceMount": "type=bind,source=${localWorkspaceFolder},target=/workspace"
 }

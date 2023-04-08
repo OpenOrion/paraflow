@@ -8,6 +8,7 @@ from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
 from paraflow.flow_station import FlowStation
 from paraflow.passages.common import Passage
+import ray
 
 CONFIG_FILE_NAME = "config.cfg"
 
@@ -36,7 +37,7 @@ def setup_simulation(
             f.write(f"{key}= {value}\n")
         export_to_su2(mesh, config['MESH_FILENAME'])
 
-
+@ray.remote
 def run_simulation(
     passage: Passage,
     inflow: FlowStation,
@@ -104,7 +105,7 @@ def run_simulation(
                     )
 
     # Output the solution to file
-    SU2Driver.Output(0)
+    # SU2Driver.Output(0)
 
 
     # Finalize the solver and exit cleanly

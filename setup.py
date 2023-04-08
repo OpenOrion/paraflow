@@ -15,6 +15,7 @@ setup(
     "ezmesh @ git+https://github.com/Turbodesigner/ezmesh.git",
     "pysu2 @ git+https://github.com/Turbodesigner/pysu2.git",
     "mpi4py",
-    "pymoo"
+    "pymoo",
+    "ray[default]"
    ]
 )

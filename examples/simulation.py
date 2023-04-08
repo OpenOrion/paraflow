@@ -8,7 +8,7 @@ sys.path.append(f"{project_path}")
 # %%
 from paraflow import SymmetricPassage, run_simulation, FlowStation
 from paraflow.optimize import OptimizationSpecification, optimize
-
+import ray
 from ezmesh import visualize_mesh
 import numpy as np
 
@@ -32,13 +32,14 @@ inflow = FlowStation(
 # passage.visualize()
 
 
-# run_simulation(passage, inflow, "/workspaces/paraflow/simulation")
-
+# remote_result = run_simulation.remote(passage, inflow, "/workspaces/paraflow/simulation")
+# sim_results = ray.get(remote_result)
 
 spec = OptimizationSpecification(
     inflow=inflow,
     inlet_radius=0.2,
     num_ctrl_pts=3,
+    num_throat_pts= 1,
     objectives=[("mach", "max")],
     area_ratio=2
 )

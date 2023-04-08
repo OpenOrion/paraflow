@@ -28,4 +28,7 @@
         "--extension-pkg-whitelist=numpy"
     ],
     "python.analysis.typeCheckingMode": "basic",
+    "docker.environment": {
+        "DOCKER_HOST": "ssh://afshawn@20.3.160.158"
+    }
 }

@@ -1,20 +1,21 @@
 # %%
 from dataclasses import dataclass
+import pickle
 from typing import List, Literal, Optional, Tuple
 import numpy as np
 from paraflow.flow_station import FlowStation
 import numpy as np
-from paraflow import SymmetricPassage, run_simulation, FlowStation
+from paraflow import FlowStation
 from pymoo.core.problem import ElementwiseProblem
-
-from pymoo.core.problem import Problem
+from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling
-from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 
-
+from paraflow.passages.symmetric import SymmetricPassage
+from paraflow.simulation import run_simulation
+import ray
 
 MaxOrMin = Literal["max", "min"]
 
@@ -24,76 +25,94 @@ class OptimizationSpecification:
     inflow: FlowStation
     inlet_radius: float
     num_ctrl_pts: int
+    num_throat_pts: int
     objectives: List[Tuple[Literal["mach"], MaxOrMin]]
     area_ratio: Optional[float] = None
 
 
 class PassageOptimizationProblem(ElementwiseProblem):
+
     def __init__(self, spec: OptimizationSpecification):
         self.spec = spec
-
-        prop_lower_bound = np.zeros(self.spec.num_ctrl_pts)
-        prop_upper_bound = np.ones(self.spec.num_ctrl_pts)
-
-        angles_lower_bound = np.full(self.spec.num_ctrl_pts, -np.pi/2)
-        angles_upper_bound = np.full(self.spec.num_ctrl_pts, 2*np.pi)
-
-    # contour_props=[0.25, 0.25, 0.35, 0.5, 0.5, 0.75],
-    # contour_angles=np.radians([-15.0, -15.0, 0.0, 3, 5.0, 15.0]).tolist()
-
+        self.iteration = 0
+        self.variable_config = {
+            "contour_props": np.tile([0,1], (self.spec.num_ctrl_pts,1)),
+            "contour_angles": np.tile([0, np.pi/2], (self.spec.num_ctrl_pts,1)),
+        }
+        bounds = np.concatenate(list(self.variable_config.values()), axis=0)
         super().__init__(
-            n_var=self.spec.num_ctrl_pts,
+            n_var=self.spec.num_ctrl_pts*2,
             n_obj=len(self.spec.objectives),
-            n_ieq_constr=0,
-            # xl=0,
-            # xu=1
-            xl=np.concatenate([prop_lower_bound, angles_lower_bound]),
-            xu=np.concatenate([prop_upper_bound, angles_upper_bound]),
+            n_ieq_constr=1,
+            xl=bounds[:, 0],
+            xu=bounds[:, 1],
         )
 
     def _evaluate(self, x, out, *args, **kwargs):
-        print(x)
-        # passage = SymmetricPassage(
-        #     inlet_radius=self.spec.inlet_radius,
-        #     area_ratio=self.spec.area_ratio,
-        #     axial_length=1,
-        #     contour_props=x[:, :self.spec.num_ctrl_pts].tolist(),
-        #     contour_angles=x[:, self.spec.num_ctrl_pts:].tolist(),
-        # )
+        is_valid = True
+        try:
+            variable_values = {}
+            variable_offset = 0
+            for variable_name, bounds in self.variable_config.items():            
+                variable_values[variable_name] = x[variable_offset:variable_offset+bounds.shape[0]]
+                variable_offset += bounds.shape[0] 
 
-        # sim_results = run_simulation(passage, self.spec.inflow, "/workspaces/paraflow/simulation")
-        # objectives = []
-        # for obj, direction in self.spec.objectives:
-        #     sign = -1 if direction == "max" else 1
-        #     if obj == "mach":
-        #         obj_val = sim_results["mid_outflow"].mach_number
-        #     else:
-        #         raise ValueError(f"Unknown objective {obj}")
-        #     objectives.append(sign * obj_val)
+            sort_idx = np.argsort(variable_values["contour_props"])
+            contour_props = variable_values["contour_props"][sort_idx]
+            contour_angles = variable_values["contour_angles"][sort_idx]
+            contour_angles[:self.spec.num_throat_pts] = -contour_angles[:self.spec.num_throat_pts] 
 
-        out["F"] = np.column_stack([0])
-        out["G"] = np.column_stack([])
+            passage = SymmetricPassage(
+                inlet_radius=self.spec.inlet_radius,
+                area_ratio=self.spec.area_ratio,
+                axial_length=1,
+                contour_props=contour_props.tolist(),
+                contour_angles=contour_angles.tolist(),
+            )
 
+            assert (passage.ctrl_pnts[:, 1] > 0).all()
+
+            remote_result = run_simulation.remote(passage, self.spec.inflow, "/workspaces/paraflow/simulation")
+            sim_results = ray.get(remote_result)
+            objectives = []
+            for obj, direction in self.spec.objectives:
+                sign = -1 if direction == "max" else 1
+                if obj == "mach":
+                    obj_val = sim_results["mid_outflow"].mach_number
+                else:
+                    raise ValueError(f"Unknown objective {obj}")
+                objectives.append(sign * obj_val)
+            print(objectives)
+            passage.visualize(f"nozzle{self.iteration}", show=False)
+            self.iteration += 1
+
+        except:
+            objectives = np.zeros(len(self.spec.objectives))
+            is_valid = False
+
+        out["F"] = objectives
+        out["G"] = [int(not is_valid)]
 
 def optimize(spec: OptimizationSpecification):
     problem = PassageOptimizationProblem(spec)
+
     algorithm = NSGA2(
-        pop_size=100,
+        pop_size=40,
         n_offsprings=10,
         sampling=FloatRandomSampling(),
-        crossover=SBX(prob=1.0, eta=3, vtype=float),
-        mutation=PM(prob=1.0, eta=3, vtype=float),
+        crossover=SBX(prob=0.9, eta=15),
+        mutation=PM(eta=20),
         eliminate_duplicates=True
     )
 
+    res = minimize(problem,
+                   algorithm,
+                   ("n_gen", 10000),
+                   seed=1,
+                   save_history=True,
+                   verbose=True)
 
-    res = minimize(
-        problem,
-        algorithm,
-        termination=('n_gen', 40),
-        seed=1,
-        save_history=True,
-        verbose=True
-    )
-    # with open('optimization.pkl', 'wb') as optimization_result_file:
-    #     pickle.dump(res, optimization_result_file, pickle.HIGHEST_PROTOCOL)
+    # X, F = res.opt.get("X", "F")
+
+    with open('optimization.pkl', 'wb') as optimization_result_file:
+        pickle.dump(res, optimization_result_file, pickle.HIGHEST_PROTOCOL)

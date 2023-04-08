@@ -77,6 +77,7 @@ class SymmetricPassage(Passage):
             ]
         )
 
+
     def get_contour_line(self, num_points=50):
         contour_bspline = get_bspline(self.ctrl_pnts, 3)
         return contour_bspline(np.linspace(0, 1, num_points))
@@ -122,8 +123,12 @@ class SymmetricPassage(Passage):
         fig.add_trace(go.Scatter(x=contour_line[:, 0], y=contour_line[:, 1], name=f"Contour Top"))
         fig.add_trace(go.Scatter(x=contour_line[:, 0], y=-contour_line[:, 1], name=f"Contour Bottom"))
 
+        fig.write_image(title + ".png") 
+
+
         fig.layout.yaxis.scaleanchor = "x"  # type: ignore
-        fig.show()
+        if show:
+            fig.show()
 
     @staticmethod
     def get_config(inflow: FlowStation, working_directory: str):
