@@ -1,5 +1,6 @@
 # %%
 from dataclasses import dataclass
+import multiprocessing
 import pickle
 from typing import List, Literal, Optional, Tuple
 import numpy as np
@@ -12,12 +13,17 @@ from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
+from pymoo.core.problem import StarmapParallelization
 
 from paraflow.passages.symmetric import SymmetricPassage
 from paraflow.simulation import run_simulation
 import ray
+import os
 
 MaxOrMin = Literal["max", "min"]
+n_proccess = 1
+pool = multiprocessing.Pool(n_proccess)
+runner = StarmapParallelization(pool.starmap)
 
 
 @dataclass
@@ -46,6 +52,7 @@ class PassageOptimizationProblem(ElementwiseProblem):
             n_ieq_constr=1,
             xl=bounds[:, 0],
             xu=bounds[:, 1],
+            elementwise_runner=runner
         )
 
     def _evaluate(self, x, out, *args, **kwargs):
@@ -72,7 +79,7 @@ class PassageOptimizationProblem(ElementwiseProblem):
 
             assert (passage.ctrl_pnts[:, 1] > 0).all()
 
-            remote_result = run_simulation.remote(passage, self.spec.inflow, "/workspaces/paraflow/simulation")
+            remote_result = run_simulation.remote(passage, self.spec.inflow, "/workspace/simulation")
             sim_results = ray.get(remote_result)
             objectives = []
             for obj, direction in self.spec.objectives:
@@ -83,7 +90,9 @@ class PassageOptimizationProblem(ElementwiseProblem):
                     raise ValueError(f"Unknown objective {obj}")
                 objectives.append(sign * obj_val)
             print(objectives)
-            passage.visualize(f"nozzle{self.iteration}", show=False)
+            passage.visualize(f"nozzle{self.iteration}", show=False, save_path=f"./output/nozzle{self.iteration}")
+            os.rename('./simulation/flow.vtu', f'./simulation/flow{self.iteration}.vtu')
+
             self.iteration += 1
 
         except:

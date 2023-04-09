@@ -32,9 +32,9 @@ inflow = FlowStation(
 # passage.visualize()
 
 
-# remote_result = run_simulation.remote(passage, inflow, "/workspaces/paraflow/simulation")
+# remote_result = run_simulation.remote(passage, inflow, "/workspace/simulation")
 # sim_results = ray.get(remote_result)
-
+# print(sim_results)
 spec = OptimizationSpecification(
     inflow=inflow,
     inlet_radius=0.2,

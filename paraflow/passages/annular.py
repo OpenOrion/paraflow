@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 import plotly.graph_objects as go
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_station import FlowStation
@@ -66,7 +67,7 @@ class AnnularPassage(Passage):
             mesh.add_target_point("mid_outflow", "outflow", 0.5)
             return mesh
 
-    def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True):
+    def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         fig = go.Figure(layout=go.Layout(title=go.layout.Title(text=title)))
 
         if include_ctrl_pnts:
@@ -82,7 +83,12 @@ class AnnularPassage(Passage):
         fig.add_trace(go.Scatter(x=shroud_line[:, 0], y=-shroud_line[:, 1], name=f"Shroud Bottom"))
 
         fig.layout.yaxis.scaleanchor = "x"  # type: ignore
-        fig.show()
+
+        if save_path:
+            fig.write_image(save_path) 
+        if show:
+            fig.show()
+
 
     @staticmethod
     def get_config(inflow: FlowStation, working_directory: str):

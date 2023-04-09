@@ -113,7 +113,7 @@ class SymmetricPassage(Passage):
             mesh.add_target_point("bottom_outflow", "outflow", 1.0)
             return mesh
 
-    def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True):
+    def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         fig = go.Figure(layout=go.Layout(title=go.layout.Title(text=title)))
 
         if include_ctrl_pnts:
@@ -123,10 +123,12 @@ class SymmetricPassage(Passage):
         fig.add_trace(go.Scatter(x=contour_line[:, 0], y=contour_line[:, 1], name=f"Contour Top"))
         fig.add_trace(go.Scatter(x=contour_line[:, 0], y=-contour_line[:, 1], name=f"Contour Bottom"))
 
-        fig.write_image(title + ".png") 
 
 
         fig.layout.yaxis.scaleanchor = "x"  # type: ignore
+
+        if save_path:
+            fig.write_image(save_path) 
         if show:
             fig.show()
 
