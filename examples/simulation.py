@@ -32,18 +32,19 @@ inflow = FlowStation(
 # passage.visualize()
 
 
-# remote_result = run_simulation.remote(passage, inflow, "/workspace/simulation")
-# sim_results = ray.get(remote_result)
-# print(sim_results)
-spec = OptimizationSpecification(
-    inflow=inflow,
-    inlet_radius=0.2,
-    num_ctrl_pts=3,
-    num_throat_pts= 1,
-    objectives=[("mach", "max")],
-    area_ratio=2
-)
+remote_result = run_simulation.remote(passage, inflow, "/workspaces/paraflow/simulation", "1")
+sim_results = ray.get(remote_result)
+print(sim_results)
+# spec = OptimizationSpecification(
+#     working_directory="/workspaces/paraflow/simulation",
+#     inflow=inflow,
+#     inlet_radius=0.2,
+#     num_ctrl_pts=3,
+#     num_throat_pts= 1,
+#     objectives=[("mach", "max")],
+#     area_ratio=2
+# )
 
-optimize(spec)
+# optimize(spec)
 
 # %%

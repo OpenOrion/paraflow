@@ -8,7 +8,7 @@ import numpy as np
 import numpy.typing as npt
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_station import FlowStation
-from paraflow.passages.common import Passage
+from paraflow.passages.passage import Passage
 
 
 def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
@@ -133,7 +133,7 @@ class SymmetricPassage(Passage):
             fig.show()
 
     @staticmethod
-    def get_config(inflow: FlowStation, working_directory: str):
+    def get_config(inflow: FlowStation, working_directory: str, id: str):
         outflow_static_pressure = 200000.0
         return {
             "SOLVER": "RANS",
@@ -185,16 +185,10 @@ class SymmetricPassage(Passage):
             "ITER": 100,
             "CONV_RESIDUAL_MINVAL": -24,
             "CONV_STARTITER": 10,
-            "MESH_FILENAME": f"{working_directory}/passage.su2",
+            "MESH_FILENAME": f"{working_directory}/passage{id}.su2",
             "MESH_FORMAT": "SU2",
-            "MESH_OUT_FILENAME": f"{working_directory}/mesh_out.su2",
-            "SOLUTION_FILENAME": f"{working_directory}/solution_flow.dat",
-            "SOLUTION_ADJ_FILENAME": f"{working_directory}/solution_adj.dat",
             "TABULAR_FORMAT": "CSV",
-            "CONV_FILENAME": f"{working_directory}/history",
-            "RESTART_FILENAME": f"{working_directory}/restart_flow.dat",
-            "VOLUME_FILENAME": f"{working_directory}/flow",
-            "SURFACE_FILENAME": f"{working_directory}/surface_flow",
+            "VOLUME_FILENAME": f"{working_directory}/flow{id}",
             "OUTPUT_WRT_FREQ": 1000,
             "SCREEN_OUTPUT": "(INNER_ITER, RMS_DENSITY, RMS_TKE, RMS_DISSIPATION, LIFT, DRAG)",
         }

@@ -3,7 +3,7 @@ from typing import Optional
 import plotly.graph_objects as go
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_station import FlowStation
-from paraflow.passages.common import Passage
+from paraflow.passages.passage import Passage
 from paraflow.passages.symmetric import SymmetricPassage
 
 
@@ -91,7 +91,7 @@ class AnnularPassage(Passage):
 
 
     @staticmethod
-    def get_config(inflow: FlowStation, working_directory: str):
-        config = SymmetricPassage.get_config(inflow, working_directory)
+    def get_config(inflow: FlowStation, working_directory: str, id: str):
+        config = SymmetricPassage.get_config(inflow, working_directory, id)
         del config["MARKER_SYM"]
         return config

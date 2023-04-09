@@ -18,7 +18,6 @@ from pymoo.core.problem import StarmapParallelization
 from paraflow.passages.symmetric import SymmetricPassage
 from paraflow.simulation import run_simulation
 import ray
-import os
 
 MaxOrMin = Literal["max", "min"]
 n_proccess = 1
@@ -28,6 +27,7 @@ runner = StarmapParallelization(pool.starmap)
 
 @dataclass
 class OptimizationSpecification:
+    working_directory: str
     inflow: FlowStation
     inlet_radius: float
     num_ctrl_pts: int
@@ -52,7 +52,7 @@ class PassageOptimizationProblem(ElementwiseProblem):
             n_ieq_constr=1,
             xl=bounds[:, 0],
             xu=bounds[:, 1],
-            elementwise_runner=runner
+            # elementwise_runner=runner
         )
 
     def _evaluate(self, x, out, *args, **kwargs):
@@ -76,10 +76,12 @@ class PassageOptimizationProblem(ElementwiseProblem):
                 contour_props=contour_props.tolist(),
                 contour_angles=contour_angles.tolist(),
             )
+            # passage.write(f"./simulation/passage{self.iteration}.json")
+            passage.visualize(f"passage{self.iteration}", show=False, save_path=f"./simulation/passage{self.iteration}.png")
 
             assert (passage.ctrl_pnts[:, 1] > 0).all()
 
-            remote_result = run_simulation.remote(passage, self.spec.inflow, "/workspace/simulation")
+            remote_result = run_simulation.remote(passage, self.spec.inflow, self.spec.working_directory, f"{self.iteration}")
             sim_results = ray.get(remote_result)
             objectives = []
             for obj, direction in self.spec.objectives:
@@ -89,15 +91,14 @@ class PassageOptimizationProblem(ElementwiseProblem):
                 else:
                     raise ValueError(f"Unknown objective {obj}")
                 objectives.append(sign * obj_val)
-            print(objectives)
-            passage.visualize(f"nozzle{self.iteration}", show=False, save_path=f"./output/nozzle{self.iteration}")
-            os.rename('./simulation/flow.vtu', f'./simulation/flow{self.iteration}.vtu')
 
-            self.iteration += 1
-
-        except:
+            objectives.append(0)
+        except Exception as e:
+            print(e)
             objectives = np.zeros(len(self.spec.objectives))
             is_valid = False
+        
+        self.iteration += 1
 
         out["F"] = objectives
         out["G"] = [int(not is_valid)]

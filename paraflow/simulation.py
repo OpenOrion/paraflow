@@ -7,10 +7,8 @@ from mpi4py import MPI
 from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
 from paraflow.flow_station import FlowStation
-from paraflow.passages.common import Passage
+from paraflow.passages.passage import Passage
 import ray
-
-CONFIG_FILE_NAME = "config.cfg"
 
 
 @dataclass
@@ -30,29 +28,32 @@ class TargetState:
 def setup_simulation(
     mesh: Mesh,
     config: Dict,
-    working_directory: str,
+    save_path: str,
 ):
-    with open(f"{working_directory}/{CONFIG_FILE_NAME}", "w") as f:
+    with open(save_path, "w") as f:
         for key, value in config.items():
             f.write(f"{key}= {value}\n")
         export_to_su2(mesh, config['MESH_FILENAME'])
+
 
 @ray.remote
 def run_simulation(
     passage: Passage,
     inflow: FlowStation,
     working_directory: str,
+    id: str
 ):
-    config = passage.get_config(inflow, working_directory)
+    config_path = f"{working_directory}/config{id}.cfg"
+    config = passage.get_config(inflow, working_directory, id)
     mesh = passage.get_mesh()
-    setup_simulation(mesh, config, working_directory)
-
+    setup_simulation(mesh, config, config_path)
+    
     # Import mpi4py for parallel run
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 
     # Initialize the corresponding driver of SU2, this includes solver preprocessing
-    SU2Driver = pysu2.CSinglezoneDriver(f"{working_directory}/{CONFIG_FILE_NAME}", 1, comm)
+    SU2Driver = pysu2.CSinglezoneDriver(config_path, 1, comm)
 
     # Get all the boundary tags
     MarkerList = SU2Driver.GetMarkerTags()
@@ -105,8 +106,7 @@ def run_simulation(
                     )
 
     # Output the solution to file
-    # SU2Driver.Output(0)
-
+    SU2Driver.Output(0)
 
     # Finalize the solver and exit cleanly
     SU2Driver.Finalize()

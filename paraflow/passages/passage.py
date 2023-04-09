@@ -1,6 +1,8 @@
 from typing import Any, Dict, Optional, Protocol
 from ezmesh import Mesh
 from paraflow.flow_station import FlowStation
+import json
+
 class Passage(Protocol):
     def get_mesh(self, mesh_size: float = 0.01) -> Mesh: # type: ignore
         pass
@@ -9,5 +11,9 @@ class Passage(Protocol):
         pass
     
     @staticmethod
-    def get_config(inflow: FlowStation, working_directory: str) -> Dict[str, Any]: # type: ignore
+    def get_config(inflow: FlowStation, working_directory: str, id: str) -> Dict[str, Any]: # type: ignore
         pass
+    
+    def write(self, path: str):
+        with open(path, "w") as f:
+            json.dump(self.__dict__, f)
