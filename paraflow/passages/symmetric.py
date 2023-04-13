@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import List, Optional, cast
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
 import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
@@ -7,7 +7,7 @@ from scipy.interpolate import BSpline
 import numpy as np
 import numpy.typing as npt
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
-from paraflow.flow_station import FlowStation
+from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
 
 
@@ -44,13 +44,13 @@ class SymmetricPassage(Passage):
         self.symetry_line = np.array([[0.0, 0.0], [self.axial_length, 0.0]])
 
         if self.area_ratio is not None:
-            self.exit_radius = self.area_ratio*self.inlet_radius
-            self.exit_angle = np.arctan((self.exit_radius - self.inlet_radius)/self.axial_length)
+            self.outlet_radius = self.area_ratio*self.inlet_radius
+            self.exit_angle = np.arctan((self.outlet_radius - self.inlet_radius)/self.axial_length)
         else:
             assert self.contour_angles is not None, "must specify contour angles if area ratio is not specified"
             self.exit_angle = self.contour_angles[-1]
-            self.exit_radius = np.tan(self.exit_angle)*self.axial_length + self.inlet_radius
-            self.area_ratio = self.exit_radius/self.inlet_radius
+            self.outlet_radius = np.tan(self.exit_angle)*self.axial_length + self.inlet_radius
+            self.area_ratio = self.outlet_radius/self.inlet_radius
 
         if self.contour_props and self.contour_angles:
             assert len(self.contour_props) == len(self.contour_angles), "must specify same number of contour props and angles"
@@ -73,10 +73,9 @@ class SymmetricPassage(Passage):
             [
                 [0.0, self.inlet_radius],
                 *contour_ctrl_pnts,
-                [self.axial_length, self.exit_radius]
+                [self.axial_length, self.outlet_radius]
             ]
         )
-
 
     def get_contour_line(self, num_points=50):
         contour_bspline = get_bspline(self.ctrl_pnts, 3)
@@ -123,17 +122,15 @@ class SymmetricPassage(Passage):
         fig.add_trace(go.Scatter(x=contour_line[:, 0], y=contour_line[:, 1], name=f"Contour Top"))
         fig.add_trace(go.Scatter(x=contour_line[:, 0], y=-contour_line[:, 1], name=f"Contour Bottom"))
 
-
-
         fig.layout.yaxis.scaleanchor = "x"  # type: ignore
 
         if save_path:
-            fig.write_image(save_path) 
+            fig.write_image(save_path)
         if show:
             fig.show()
 
     @staticmethod
-    def get_config(inflow: FlowStation, working_directory: str, id: str):
+    def get_config(inflow: FlowState, working_directory: str, id: str):
         outflow_static_pressure = 200000.0
         return {
             "SOLVER": "RANS",
@@ -146,12 +143,12 @@ class SymmetricPassage(Passage):
             "SIDESLIP_ANGLE": 0.0,
             "INIT_OPTION": "TD_CONDITIONS",
             "FREESTREAM_OPTION": "TEMPERATURE_FS",
-            "FREESTREAM_PRESSURE": inflow.total_pressure,
-            "FREESTREAM_TEMPERATURE": inflow.total_temperature,
+            "FREESTREAM_PRESSURE": inflow.total_state.P,
+            "FREESTREAM_TEMPERATURE": inflow.total_state.T,
             "REF_DIMENSIONALIZATION": "DIMENSIONAL",
             "FLUID_MODEL": "PR_GAS",
             "GAMMA_VALUE": inflow.gamma,
-            "GAS_CONSTANT": inflow.specific_gas_constant,
+            "GAS_CONSTANT": inflow.gas_constant,
             "CRITICAL_TEMPERATURE": inflow.total_state.pseudo_Tc(),
             "CRITICAL_PRESSURE": inflow.total_state.pseudo_Pc(),
             "ACENTRIC_FACTOR": inflow.total_state.pseudo_omega(),
@@ -161,7 +158,7 @@ class SymmetricPassage(Passage):
             "THERMAL_CONDUCTIVITY_CONSTANT": inflow.total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
             "MARKER_SYM": "symmetry",
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_pressure}, {inflow.total_temperature}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {outflow_static_pressure}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_state.P}, {inflow.total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {outflow_static_pressure}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",
@@ -189,6 +186,12 @@ class SymmetricPassage(Passage):
             "MESH_FORMAT": "SU2",
             "TABULAR_FORMAT": "CSV",
             "VOLUME_FILENAME": f"{working_directory}/flow{id}",
+            "RESTART_FILENAME":  f"{working_directory}/restart_flow{id}.dat",
+            "SURFACE_FILENAME":  f"{working_directory}/surface_flow{id}",
+            "CONV_FILENAME": f"history{id}",
             "OUTPUT_WRT_FREQ": 1000,
             "SCREEN_OUTPUT": "(INNER_ITER, RMS_DENSITY, RMS_TKE, RMS_DISSIPATION, LIFT, DRAG)",
         }
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)

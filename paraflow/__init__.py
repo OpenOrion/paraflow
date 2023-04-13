@@ -1,4 +1,4 @@
 from typing import Union
-from .flow_station import FlowStation
+from .flow_state import FlowState, get_flasher
 from .passages import AnnularPassage, SymmetricPassage, Passage
 from .simulation import run_simulation

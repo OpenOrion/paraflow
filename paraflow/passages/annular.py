@@ -1,8 +1,8 @@
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, Optional
 import plotly.graph_objects as go
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
-from paraflow.flow_station import FlowStation
+from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
 from paraflow.passages.symmetric import SymmetricPassage
 
@@ -37,6 +37,9 @@ class AnnularPassage(Passage):
             inlet_radius=self.inlet_shroud_radius,
             contour_angles=[self.shroud_angle, self.shroud_angle],
         )
+
+        self.inlet_radius = self.inlet_shroud_radius
+        self.outlet_radius = self.shroud_passage.outlet_radius
 
     def get_mesh(self, mesh_size=0.01):
         with Geometry() as geo:
@@ -91,7 +94,10 @@ class AnnularPassage(Passage):
 
 
     @staticmethod
-    def get_config(inflow: FlowStation, working_directory: str, id: str):
+    def get_config(inflow: FlowState, working_directory: str, id: str):
         config = SymmetricPassage.get_config(inflow, working_directory, id)
         del config["MARKER_SYM"]
         return config
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)

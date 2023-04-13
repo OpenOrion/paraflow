@@ -4,9 +4,8 @@ import multiprocessing
 import pickle
 from typing import List, Literal, Optional, Tuple
 import numpy as np
-from paraflow.flow_station import FlowStation
 import numpy as np
-from paraflow import FlowStation
+from paraflow import FlowState
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
@@ -28,7 +27,7 @@ runner = StarmapParallelization(pool.starmap)
 @dataclass
 class OptimizationSpecification:
     working_directory: str
-    inflow: FlowStation
+    inflow: FlowState
     inlet_radius: float
     num_ctrl_pts: int
     num_throat_pts: int

@@ -1,28 +1,12 @@
-from dataclasses import dataclass
-from functools import cached_property
 from typing import Dict
 import numpy as np
 import pysu2
 from mpi4py import MPI
 from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
-from paraflow.flow_station import FlowStation
+from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
 import ray
-
-
-@dataclass
-class TargetState:
-    pressure: float
-    temperature: float
-    sound_speed: float
-    velocity_x: float
-    velocity_y: float
-
-    @cached_property
-    def mach_number(self) -> float:
-        velocity = np.sqrt(self.velocity_x**2 + self.velocity_y**2)
-        return velocity / self.sound_speed
 
 
 def setup_simulation(
@@ -39,15 +23,16 @@ def setup_simulation(
 @ray.remote
 def run_simulation(
     passage: Passage,
-    inflow: FlowStation,
+    inflow: FlowState,
     working_directory: str,
     id: str
 ):
+
     config_path = f"{working_directory}/config{id}.cfg"
     config = passage.get_config(inflow, working_directory, id)
     mesh = passage.get_mesh()
     setup_simulation(mesh, config, config_path)
-    
+
     # Import mpi4py for parallel run
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -67,6 +52,8 @@ def run_simulation(
     soundSpeedIndex = primitiveIndices["SOUND_SPEED"]
     velocityXIndex = primitiveIndices["VELOCITY_X"]
     velocityYIndex = primitiveIndices["VELOCITY_Y"]
+    densityIndex = primitiveIndices["DENSITY"]
+
     primitives = SU2Driver.Primitives()
 
     # Time loop is defined in Python so that we have acces to SU2 functionalities at each time step
@@ -87,7 +74,7 @@ def run_simulation(
     # Monitor the solver and output solution to file if required
     SU2Driver.Monitor(0)
 
-    target_values: Dict[str, TargetState] = {}
+    target_values: Dict[str, FlowState] = {}
     for marker_name, target in mesh.target_points.items():
         marker_id = allMarkerIDs[marker_name]
         nVertex_Marker = SU2Driver.GetNumberMarkerNodes(marker_id)
@@ -97,13 +84,21 @@ def run_simulation(
                 target_name = target[target_key]
                 target_coords = mesh.points[target_key]
                 if np.allclose(target_coords[:2], marker_coords):
-                    target_values[target_name] = TargetState(
-                        pressure=primitives(iVertex, pressureIndex),
-                        temperature=primitives(iVertex, temperatureIndex),
-                        sound_speed=primitives(iVertex, soundSpeedIndex),
-                        velocity_x=primitives(iVertex, velocityXIndex),
-                        velocity_y=primitives(iVertex, velocityYIndex),
-                    )
+                    # outlet conditions
+                    pressure = primitives(iVertex, pressureIndex)
+                    temperature = primitives(iVertex, temperatureIndex)
+                    velocity_x = primitives(iVertex, velocityXIndex)
+                    velocity_y = primitives(iVertex, velocityYIndex)
+                    sound_speed = primitives(iVertex, soundSpeedIndex)
+                    density = primitives(iVertex, densityIndex)
+
+                    freestream_velocity = np.sqrt(velocity_x**2 + velocity_y**2)
+                    mach_number = freestream_velocity / sound_speed
+
+                    total_state = inflow.flasher.flash(T=temperature, P=pressure)
+                    outflow = FlowState(total_state, mach_number)
+                    outflow.reinitialize_flow(passage.outlet_area, density)
+                    target_values[target_name] = outflow
 
     # Output the solution to file
     SU2Driver.Output(0)
