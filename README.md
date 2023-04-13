@@ -28,7 +28,8 @@ pip install git+https://github.com/Turbodesigner/paraflow.git#egg=paraflow
 
 # Example
 
-## Airfoil
+## Passage
+Rocket Nozzle Passage
 ```python
 from paraflow import SymmetricPassage
 import numpy as np
@@ -42,7 +43,13 @@ passage = SymmetricPassage(
 )
 passage.visualize("Bell Nozzle")
 ```
-![Airfoil](./assets/bell.png)
+![Passage](./assets/bell.png)
+
+## Simulation
+Rocket Nozzle Simulation Example
+[simulation.ipynb](examples/simulation.ipynb)
+![Passage](./assets/bell_simulation.png)
+
 
 
 # Devlopement Setup
