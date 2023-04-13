@@ -1,28 +1,33 @@
 # %%
 from dataclasses import dataclass
+import multiprocessing
 import pickle
 from typing import List, Literal, Optional, Tuple
 import numpy as np
-from paraflow.flow_station import FlowStation
 import numpy as np
-from paraflow import FlowStation
+from paraflow import FlowState
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
+from pymoo.core.problem import StarmapParallelization
 
 from paraflow.passages.symmetric import SymmetricPassage
 from paraflow.simulation import run_simulation
 import ray
 
 MaxOrMin = Literal["max", "min"]
+n_proccess = 1
+pool = multiprocessing.Pool(n_proccess)
+runner = StarmapParallelization(pool.starmap)
 
 
 @dataclass
 class OptimizationSpecification:
-    inflow: FlowStation
+    working_directory: str
+    inflow: FlowState
     inlet_radius: float
     num_ctrl_pts: int
     num_throat_pts: int
@@ -46,6 +51,7 @@ class PassageOptimizationProblem(ElementwiseProblem):
             n_ieq_constr=1,
             xl=bounds[:, 0],
             xu=bounds[:, 1],
+            # elementwise_runner=runner
         )
 
     def _evaluate(self, x, out, *args, **kwargs):
@@ -69,10 +75,12 @@ class PassageOptimizationProblem(ElementwiseProblem):
                 contour_props=contour_props.tolist(),
                 contour_angles=contour_angles.tolist(),
             )
+            # passage.write(f"./simulation/passage{self.iteration}.json")
+            passage.visualize(f"passage{self.iteration}", show=False, save_path=f"./simulation/passage{self.iteration}.png")
 
             assert (passage.ctrl_pnts[:, 1] > 0).all()
 
-            remote_result = run_simulation.remote(passage, self.spec.inflow, "/workspaces/paraflow/simulation")
+            remote_result = run_simulation.remote(passage, self.spec.inflow, self.spec.working_directory, f"{self.iteration}")
             sim_results = ray.get(remote_result)
             objectives = []
             for obj, direction in self.spec.objectives:
@@ -82,13 +90,14 @@ class PassageOptimizationProblem(ElementwiseProblem):
                 else:
                     raise ValueError(f"Unknown objective {obj}")
                 objectives.append(sign * obj_val)
-            print(objectives)
-            passage.visualize(f"nozzle{self.iteration}", show=False)
-            self.iteration += 1
 
-        except:
+            objectives.append(0)
+        except Exception as e:
+            print(e)
             objectives = np.zeros(len(self.spec.objectives))
             is_valid = False
+        
+        self.iteration += 1
 
         out["F"] = objectives
         out["G"] = [int(not is_valid)]

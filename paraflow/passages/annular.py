@@ -1,8 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, Optional
 import plotly.graph_objects as go
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
-from paraflow.flow_station import FlowStation
-from paraflow.passages.common import Passage
+from paraflow.flow_state import FlowState
+from paraflow.passages.passage import Passage
 from paraflow.passages.symmetric import SymmetricPassage
 
 
@@ -37,6 +38,9 @@ class AnnularPassage(Passage):
             contour_angles=[self.shroud_angle, self.shroud_angle],
         )
 
+        self.inlet_radius = self.inlet_shroud_radius
+        self.outlet_radius = self.shroud_passage.outlet_radius
+
     def get_mesh(self, mesh_size=0.01):
         with Geometry() as geo:
             curve_loop = CurveLoop.from_coords(
@@ -66,7 +70,7 @@ class AnnularPassage(Passage):
             mesh.add_target_point("mid_outflow", "outflow", 0.5)
             return mesh
 
-    def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True):
+    def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         fig = go.Figure(layout=go.Layout(title=go.layout.Title(text=title)))
 
         if include_ctrl_pnts:
@@ -82,10 +86,18 @@ class AnnularPassage(Passage):
         fig.add_trace(go.Scatter(x=shroud_line[:, 0], y=-shroud_line[:, 1], name=f"Shroud Bottom"))
 
         fig.layout.yaxis.scaleanchor = "x"  # type: ignore
-        fig.show()
+
+        if save_path:
+            fig.write_image(save_path) 
+        if show:
+            fig.show()
+
 
     @staticmethod
-    def get_config(inflow: FlowStation, working_directory: str):
-        config = SymmetricPassage.get_config(inflow, working_directory)
+    def get_config(inflow: FlowState, working_directory: str, id: str):
+        config = SymmetricPassage.get_config(inflow, working_directory, id)
         del config["MARKER_SYM"]
         return config
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)

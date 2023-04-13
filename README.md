@@ -1,8 +1,8 @@
 <p align="center">
-    <img src="./assets/logo.svg" alt="drawing" width="500"/>
+    <img src="./assets/logo.svg" alt="drawing" width="200"/>
 </p>
 
-<p align="center">the open source parametric airfoil generator</p>
+<p align="center">the open source parametric flow passage generator</p>
 
 <p align="center">
     <a href="https://discord.gg/H7qRauGkQ6">
@@ -18,59 +18,36 @@
 
 
 # About
-ParaFoil is a declarative tool that parametrically generates turbomachinery and aircraft airfoils and passages with B-splines. The purpose is to generate airfoil shapes from different parameters during fluid simulation optimizations.
+ParaFlow is a declarative tool that parametrically generates turbomachinery flow passages with B-splines such as diffusers and nozzles. The purpose is to generate passages from different parameters during fluid simulation optimizations.
 
 
 # Install
 ```
-pip install git+https://github.com/Turbodesigner/parafoil.git#egg=parafoil
+pip install git+https://github.com/Turbodesigner/paraflow.git#egg=paraflow
 ```
 
 # Example
 
 ## Airfoil
 ```python
+from paraflow import SymmetricPassage
 import numpy as np
-from parafoil import Airfoil, PassageBuilder
 
-airfoil = Airfoil(
-    inlet_angle=np.radians(40.0),
-    outlet_angle=np.radians(20.0),
-    stagger_angle=np.radians(0.0),
-    upper_thick_dist=[0.05, 0.2, 0.2, 0.05, 0.01],
-    lower_thick_dist=[0.05, 0.2, 0.2, 0.05, 0.01],
-    leading_prop=0.5,
-    trailing_prop=0.5,
-    chord_length=1.44
+passage = SymmetricPassage(
+    inlet_radius=0.1,
+    area_ratio=3.0,
+    axial_length=1,
+    contour_props=[0.25, 0.25, 0.5, 0.75],
+    contour_angles=np.radians([-15.0, -5.0, 15.0, 15.0]).tolist()
 )
-python(airfoil.coords)
-airfoil.visualize(include_camber_ctrl_pnts=True)
+passage.visualize("Bell Nozzle")
 ```
-![Airfoil](./assets/airfoil.png)
-
-## Passage
-```python
-passage = PassageBuilder.airfoil_row_passage(
-    airfoil=airfoil,
-    spacing=1.0 * airfoil.chord_length,
-    leading_edge_gap=0.25,
-    trailing_edge_gap=0.25,
-    num_blades=1
-)
-
-passage.visualize()
-```
-
-![Passage](./assets/passage.png)
+![Airfoil](./assets/bell.png)
 
 
 # Devlopement Setup
 ```
-git clone https://github.com/Turbodesigner/parafoil.git
-cd parafoil
+git clone https://github.com/Turbodesigner/paraflow.git
+cd paraflow
 pip install -r requirements_dev.txt
 ```
-
-# Help Wanted
-Right now there are some items such as CFD meshing and adding more shaping. Please join the [Discord](https://discord.gg/H7qRauGkQ6) for project communications and collaboration. Please consider donating to the [Patreon](https://www.patreon.com/turbodesigner) to support future work on this project.
-

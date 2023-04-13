@@ -1,5 +1,6 @@
 history.csv
 simulation/
+output/
 DIRECT/
 *.su2
 su2/
