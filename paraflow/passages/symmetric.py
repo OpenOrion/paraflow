@@ -188,7 +188,7 @@ class SymmetricPassage(Passage):
             "VOLUME_FILENAME": f"{working_directory}/flow{id}",
             "RESTART_FILENAME":  f"{working_directory}/restart_flow{id}.dat",
             "SURFACE_FILENAME":  f"{working_directory}/surface_flow{id}",
-            "CONV_FILENAME": f"history{id}",
+            "CONV_FILENAME": f"{working_directory}/history{id}",
             "OUTPUT_WRT_FREQ": 1000,
             "SCREEN_OUTPUT": "(INNER_ITER, RMS_DENSITY, RMS_TKE, RMS_DISSIPATION, LIFT, DRAG)",
         }
