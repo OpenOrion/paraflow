@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="./assets/logo.svg" alt="drawing" width="500"/>
+    <img src="./assets/logo.svg" alt="drawing" width="200"/>
 </p>
 
 <p align="center">the open source parametric flow passage generator</p>
