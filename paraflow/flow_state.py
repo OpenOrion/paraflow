@@ -64,12 +64,12 @@ class FlowState:
     @cached_property
     def freestream_velocity(self) -> float:
         "freestream velocity (m/s)"
-        return self.mach_number*self.total_state.speed_of_sound()  # type: ignore
+        return self.mach_number*self.total_state.speed_of_sound_mass()  # type: ignore
 
     @cached_property
     def static_state(self) -> EquilibriumState:
         "static state of fluid in passage"
-        static_temperature = self.total_state.T - (self.freestream_velocity**2)/(2*self.total_state.Cp())  # type: ignore
+        static_temperature = self.total_state.T - (self.freestream_velocity**2)/(2*self.total_state.Cp_mass())  # type: ignore
         static_pressure = self.total_state.P*(static_temperature/self.total_state.T)**(self.gamma/(self.gamma - 1))
         return self.flasher.flash(T=static_temperature, P=static_pressure)
 
