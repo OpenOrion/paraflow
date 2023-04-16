@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Type, Any
 import numpy as np
 import pysu2
 from mpi4py import MPI
@@ -25,7 +25,8 @@ def run_simulation(
     passage: Passage,
     inflow: FlowState,
     working_directory: str,
-    id: str
+    id: str,
+    driver: Type[Any] = pysu2.CSinglezoneDriver, # type: ignore
 ):
     config_path = f"{working_directory}/config{id}.cfg"
     config = passage.get_config(inflow, working_directory, id)
@@ -37,10 +38,7 @@ def run_simulation(
     rank = comm.Get_rank()
 
     # Initialize the corresponding driver of SU2, this includes solver preprocessing
-    SU2Driver = pysu2.CSinglezoneDriver(config_path, 1, comm)
-
-    # Get all the boundary tags
-    MarkerList = SU2Driver.GetMarkerTags()
+    SU2Driver: pysu2.CFluidDriver = driver(config_path, 1, comm)
 
     # Get all the markers defined on this rank and their associated indices.
     allMarkerIDs = SU2Driver.GetMarkerIndices()
@@ -63,9 +61,6 @@ def run_simulation(
 
     # Run one time-step (static: one simulation)
     SU2Driver.Run()
-
-    # Postprocess
-    SU2Driver.Postprocess()
 
     # Update the solver for the next time iteration
     SU2Driver.Update()
