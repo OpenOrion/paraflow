@@ -38,8 +38,8 @@ class AnnularPassage(Passage):
             contour_angles=[self.shroud_angle, self.shroud_angle],
         )
 
-        self.inlet_radius = self.inlet_shroud_radius
-        self.outlet_radius = self.shroud_passage.outlet_radius
+        self.inlet_length = self.inlet_shroud_radius
+        self.outlet_length = self.shroud_passage.outlet_length
 
     def get_mesh(self, mesh_size=0.01):
         with Geometry() as geo:
@@ -88,10 +88,9 @@ class AnnularPassage(Passage):
         fig.layout.yaxis.scaleanchor = "x"  # type: ignore
 
         if save_path:
-            fig.write_image(save_path) 
+            fig.write_image(save_path)
         if show:
             fig.show()
-
 
     @staticmethod
     def get_config(inflow: FlowState, working_directory: str, id: str):
