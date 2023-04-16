@@ -40,6 +40,9 @@ class FlowState:
     mass_flow_rate: Optional[float] = None
     "mass flow rate (kg/s)"
 
+    radius: Optional[float] = None
+    "radius of flow passage (m)"
+
     absolute_angle: Optional[float] = None
     "absolute angle of flow (rad)"
 
@@ -50,11 +53,15 @@ class FlowState:
         self.flasher = cast(Flash, self.total_state.flasher)
         self.gamma = cast(float, self.total_state.Cp_Cv_ratio())  # type: ignore
 
-    def reinitialize_flow(self, flow_area: float, density: Optional[float] = None):
-        if density is None:
-            density = self.total_state.rho_mass()
-        self.flow_area = flow_area
-        self.mass_flow_rate = flow_area*self.freestream_velocity*density  # type: ignore
+        if self.radius and self.mass_flow_rate:
+            raise ValueError("Only one of radius or mass flow rate can be defined")
+
+        if self.radius:
+            self.flow_area = np.pi*self.radius**2
+            self.mass_flow_rate = self.flow_area*self.freestream_velocity*self.total_state.rho_mass()
+        elif self.mass_flow_rate:
+            self.flow_area = self.mass_flow_rate/(self.freestream_velocity*self.total_state.rho_mass())
+            self.radius = np.sqrt(self.flow_area/np.pi)
 
     @cached_property
     def gas_constant(self):
@@ -72,12 +79,6 @@ class FlowState:
         static_temperature = self.total_state.T - (self.freestream_velocity**2)/(2*self.total_state.Cp_mass())  # type: ignore
         static_pressure = self.total_state.P*(static_temperature/self.total_state.T)**(self.gamma/(self.gamma - 1))
         return self.flasher.flash(T=static_temperature, P=static_pressure)
-
-    @cached_property
-    def flow_area(self) -> float:
-        "flow area (m^2)"
-        assert self.mass_flow_rate, "mass flow rate must be defined"
-        return self.mass_flow_rate*(self.static_state.rho_mass()*self.freestream_velocity)
 
     @cached_property
     def absolute_tangential_velocity(self):

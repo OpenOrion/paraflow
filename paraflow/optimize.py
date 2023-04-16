@@ -1,4 +1,3 @@
-# %%
 from dataclasses import dataclass
 import multiprocessing
 import pickle
@@ -25,7 +24,7 @@ runner = StarmapParallelization(pool.starmap)
 
 
 @dataclass
-class OptimizationSpecification:
+class PassageOptimizationSpecification:
     working_directory: str
     inflow: FlowState
     inlet_radius: float
@@ -37,12 +36,12 @@ class OptimizationSpecification:
 
 class PassageOptimizationProblem(ElementwiseProblem):
 
-    def __init__(self, spec: OptimizationSpecification):
+    def __init__(self, spec: PassageOptimizationSpecification):
         self.spec = spec
         self.iteration = 0
         self.variable_config = {
-            "contour_props": np.tile([0,1], (self.spec.num_ctrl_pts,1)),
-            "contour_angles": np.tile([0, np.pi/2], (self.spec.num_ctrl_pts,1)),
+            "contour_props": np.tile([0, 1], (self.spec.num_ctrl_pts, 1)),
+            "contour_angles": np.tile([0, np.pi/2], (self.spec.num_ctrl_pts, 1)),
         }
         bounds = np.concatenate(list(self.variable_config.values()), axis=0)
         super().__init__(
@@ -59,14 +58,14 @@ class PassageOptimizationProblem(ElementwiseProblem):
         try:
             variable_values = {}
             variable_offset = 0
-            for variable_name, bounds in self.variable_config.items():            
+            for variable_name, bounds in self.variable_config.items():
                 variable_values[variable_name] = x[variable_offset:variable_offset+bounds.shape[0]]
-                variable_offset += bounds.shape[0] 
+                variable_offset += bounds.shape[0]
 
             sort_idx = np.argsort(variable_values["contour_props"])
             contour_props = variable_values["contour_props"][sort_idx]
             contour_angles = variable_values["contour_angles"][sort_idx]
-            contour_angles[:self.spec.num_throat_pts] = -contour_angles[:self.spec.num_throat_pts] 
+            contour_angles[:self.spec.num_throat_pts] = -contour_angles[:self.spec.num_throat_pts]
 
             passage = SymmetricPassage(
                 inlet_radius=self.spec.inlet_radius,
@@ -75,13 +74,13 @@ class PassageOptimizationProblem(ElementwiseProblem):
                 contour_props=contour_props.tolist(),
                 contour_angles=contour_angles.tolist(),
             )
-            # passage.write(f"./simulation/passage{self.iteration}.json")
-            passage.visualize(f"passage{self.iteration}", show=False, save_path=f"./simulation/passage{self.iteration}.png")
+            passage.write(f"{self.spec.working_directory}/passage{self.iteration}.json")
 
             assert (passage.ctrl_pnts[:, 1] > 0).all()
 
             remote_result = run_simulation.remote(passage, self.spec.inflow, self.spec.working_directory, f"{self.iteration}")
             sim_results = ray.get(remote_result)
+            passage.visualize(f"passage{self.iteration}", show=False, save_path=f"{self.spec.working_directory}/passage{self.iteration}.png")
             objectives = []
             for obj, direction in self.spec.objectives:
                 sign = -1 if direction == "max" else 1
@@ -96,13 +95,14 @@ class PassageOptimizationProblem(ElementwiseProblem):
             print(e)
             objectives = np.zeros(len(self.spec.objectives))
             is_valid = False
-        
+
         self.iteration += 1
 
         out["F"] = objectives
         out["G"] = [int(not is_valid)]
 
-def optimize(spec: OptimizationSpecification):
+
+def optimize(spec: PassageOptimizationSpecification):
     problem = PassageOptimizationProblem(spec)
 
     algorithm = NSGA2(
@@ -123,5 +123,5 @@ def optimize(spec: OptimizationSpecification):
 
     # X, F = res.opt.get("X", "F")
 
-    with open('optimization.pkl', 'wb') as optimization_result_file:
+    with open(f'{spec.working_directory}/optimization.pkl', 'wb') as optimization_result_file:
         pickle.dump(res, optimization_result_file, pickle.HIGHEST_PROTOCOL)
