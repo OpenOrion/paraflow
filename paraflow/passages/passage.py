@@ -11,13 +11,6 @@ class Passage(Protocol):
     outlet_radius: float
     "outlet radius (m)"
 
-    @property
-    def inlet_area(self):
-        return np.pi*self.inlet_radius**2
-
-    @property
-    def outlet_area(self):
-        return np.pi*self.outlet_radius**2
 
     def get_mesh(self, mesh_size: float = 0.01) -> Mesh: # type: ignore
         pass

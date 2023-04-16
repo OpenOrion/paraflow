@@ -27,7 +27,6 @@ def run_simulation(
     working_directory: str,
     id: str
 ):
-
     config_path = f"{working_directory}/config{id}.cfg"
     config = passage.get_config(inflow, working_directory, id)
     mesh = passage.get_mesh()
@@ -96,8 +95,7 @@ def run_simulation(
                     mach_number = freestream_velocity / sound_speed
 
                     total_state = inflow.flasher.flash(T=temperature, P=pressure)
-                    outflow = FlowState(total_state, mach_number)
-                    outflow.reinitialize_flow(passage.outlet_area, density)
+                    outflow = FlowState(total_state, mach_number, radius=passage.outlet_radius)
                     target_values[target_name] = outflow
 
     # Output the solution to file
