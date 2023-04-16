@@ -26,7 +26,7 @@ def run_simulation(
     inflow: FlowState,
     working_directory: str,
     id: str,
-    driver: Type[Any] = pysu2.CSinglezoneDriver, # type: ignore
+    driver: Type[Any] = pysu2.CSinglezoneDriver,  # type: ignore
 ):
     config_path = f"{working_directory}/config{id}.cfg"
     config = passage.get_config(inflow, working_directory, id)
@@ -90,7 +90,7 @@ def run_simulation(
                     mach_number = freestream_velocity / sound_speed
 
                     total_state = inflow.flasher.flash(T=temperature, P=pressure)
-                    outflow = FlowState(total_state, mach_number, radius=passage.outlet_radius)
+                    outflow = FlowState(total_state, mach_number, radius=passage.outlet_length)
                     target_values[target_name] = outflow
 
     # Output the solution to file

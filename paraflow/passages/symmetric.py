@@ -44,13 +44,13 @@ class SymmetricPassage(Passage):
         self.symetry_line = np.array([[0.0, 0.0], [self.axial_length, 0.0]])
 
         if self.area_ratio is not None:
-            self.outlet_radius = self.area_ratio*self.inlet_radius
-            self.exit_angle = np.arctan((self.outlet_radius - self.inlet_radius)/self.axial_length)
+            self.outlet_length = self.area_ratio*self.inlet_radius
+            self.exit_angle = np.arctan((self.outlet_length - self.inlet_radius)/self.axial_length)
         else:
             assert self.contour_angles is not None, "must specify contour angles if area ratio is not specified"
             self.exit_angle = self.contour_angles[-1]
-            self.outlet_radius = np.tan(self.exit_angle)*self.axial_length + self.inlet_radius
-            self.area_ratio = self.outlet_radius/self.inlet_radius
+            self.outlet_length = np.tan(self.exit_angle)*self.axial_length + self.inlet_radius
+            self.area_ratio = self.outlet_length/self.inlet_radius
 
         if self.contour_props and self.contour_angles:
             assert len(self.contour_props) == len(self.contour_angles), "must specify same number of contour props and angles"
@@ -73,9 +73,12 @@ class SymmetricPassage(Passage):
             [
                 [0.0, self.inlet_radius],
                 *contour_ctrl_pnts,
-                [self.axial_length, self.outlet_radius]
+                [self.axial_length, self.outlet_length]
             ]
         )
+
+        self.inlet_length = self.inlet_radius
+        self.outlet_length = self.outlet_length
 
     def get_contour_line(self, num_points=50):
         contour_bspline = get_bspline(self.ctrl_pnts, 3)
