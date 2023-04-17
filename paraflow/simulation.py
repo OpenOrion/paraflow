@@ -17,6 +17,11 @@ def setup_simulation(
     with open(save_path, "w") as f:
         for key, value in config.items():
             f.write(f"{key}= {value}\n")
+            if key == "CONFIG_LIST":
+                for zone_config_save_path, zone_config_dict in config.items():
+                    with open(zone_config_save_path, "w") as f:
+                        for zone_config_key, zone_config_value in zone_config_dict.items():
+                            f.write(f"{zone_config_key}= {zone_config_value}\n")
         export_to_su2(mesh, config['MESH_FILENAME'])
 
 
@@ -24,12 +29,13 @@ def setup_simulation(
 def run_simulation(
     passage: Passage,
     inflow: FlowState,
+    target_outflow_static_pressure: float,
     working_directory: str,
     id: str,
     driver: Type[Any] = pysu2.CSinglezoneDriver,  # type: ignore
 ):
     config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(inflow, working_directory, id)
+    config = passage.get_config(inflow, target_outflow_static_pressure, working_directory, id)
     mesh = passage.get_mesh()
     setup_simulation(mesh, config, config_path)
 

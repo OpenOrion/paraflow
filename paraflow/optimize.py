@@ -27,6 +27,7 @@ runner = StarmapParallelization(pool.starmap)
 class PassageOptimizationSpecification:
     working_directory: str
     inflow: FlowState
+    target_outflow_static_pressure: float
     inlet_radius: float
     num_ctrl_pts: int
     num_throat_pts: int
@@ -78,7 +79,13 @@ class PassageOptimizationProblem(ElementwiseProblem):
 
             assert (passage.ctrl_pnts[:, 1] > 0).all()
 
-            remote_result = run_simulation.remote(passage, self.spec.inflow, self.spec.working_directory, f"{self.iteration}")
+            remote_result = run_simulation.remote(
+                passage, 
+                self.spec.inflow, 
+                self.spec.target_outflow_static_pressure, 
+                self.spec.working_directory, 
+                f"{self.iteration}"
+            )
             sim_results = ray.get(remote_result)
             passage.visualize(f"passage{self.iteration}", show=False, save_path=f"{self.spec.working_directory}/passage{self.iteration}.png")
             objectives = []
