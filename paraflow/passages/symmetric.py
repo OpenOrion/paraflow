@@ -132,8 +132,7 @@ class SymmetricPassage(Passage):
         if show:
             fig.show()
 
-    @staticmethod
-    def get_config(inflow: FlowState, target_outflow_static_pressure: float, working_directory: str, id: str):
+    def get_config(self, inflow: FlowState, target_outflow_static_pressure: float, working_directory: str, id: str):
         return {
             "SOLVER": "RANS",
             "KIND_TURB_MODEL": "SST",
