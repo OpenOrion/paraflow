@@ -29,13 +29,13 @@ def setup_simulation(
 def run_simulation(
     passage: Passage,
     inflow: FlowState,
-    target_outflow_static_pressure: float,
+    outflow: FlowState,
     working_directory: str,
     id: str,
     driver: Type[Any] = pysu2.CSinglezoneDriver,  # type: ignore
 ):
     config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(inflow, target_outflow_static_pressure, working_directory, id)
+    config = passage.get_config(inflow, outflow, working_directory, id)
     mesh = passage.get_mesh()
     setup_simulation(mesh, config, config_path)
 
@@ -95,9 +95,7 @@ def run_simulation(
                     freestream_velocity = np.sqrt(velocity_x**2 + velocity_y**2)
                     mach_number = freestream_velocity / sound_speed
 
-                    total_state = inflow.flasher.flash(T=temperature, P=pressure)
-                    outflow = FlowState(total_state, mach_number, radius=passage.outlet_length)
-                    target_values[target_name] = outflow
+                    target_values[target_name] = FlowState(inflow.fluid_type, inflow.state_type, temperature, pressure, mach_number, radius=passage.outlet_length)
 
     # Output the solution to file
     SU2Driver.Output(0)

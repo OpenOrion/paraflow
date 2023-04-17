@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from thermo.phases import DryAirLemmon
 from thermo.chemical_package import lemmon2000_constants, lemmon2000_correlations
-from thermo import EquilibriumState, FlashPureVLS, ChemicalConstantsPackage, CEOSLiquid, CEOSGas, SRKMIX, Flash
+from thermo import EquilibriumState, FlashPureVLS, ChemicalConstantsPackage, CEOSLiquid, CEOSGas, SRKMIX
 from chemicals import R, mixing_simple
 from thermo import EquilibriumState
 
@@ -31,10 +31,19 @@ def get_flasher(
 
 @dataclass
 class FlowState:
-    total_state: EquilibriumState
-    "total state"
+    fluid_type: Union[str, List[str]]
+    "fluid type"
 
-    mach_number: float
+    state_type: Literal["gas", "liquid"]
+    "fluid state"
+
+    total_pressure: float
+    "total pressure (Pa)"
+
+    total_temperature: float = 293.15
+    "total temperature (K)"
+
+    mach_number: Optional[float] = None
     "freestream mach number (dimensionless)"
 
     mass_flow_rate: Optional[float] = None
@@ -50,16 +59,18 @@ class FlowState:
     "translation velocity of flow passage (m/s)"
 
     def __post_init__(self) -> None:
-        self.flasher = cast(Flash, self.total_state.flasher)
+        self.flasher = get_flasher(self.fluid_type, self.state_type)
+        self.total_state = self.flasher.flash(T=self.total_temperature, P=self.total_pressure)
         self.gamma = cast(float, self.total_state.Cp_Cv_ratio())  # type: ignore
-
-        if self.radius and self.mass_flow_rate:
-            raise ValueError("Only one of radius or mass flow rate can be defined")
 
         if self.radius:
             self.flow_area = np.pi*self.radius**2
-            self.mass_flow_rate = self.flow_area*self.freestream_velocity*self.total_state.rho_mass()
-        elif self.mass_flow_rate:
+            if self.mass_flow_rate and self.mach_number is None:
+                self.freestream_velocity = self.mass_flow_rate/(self.flow_area*self.total_state.rho_mass())
+                self.mach_number = self.freestream_velocity/self.total_state.speed_of_sound_mass()  # type: ignore
+            else:
+                self.mass_flow_rate = self.flow_area*self.freestream_velocity*self.total_state.rho_mass()
+        elif self.mass_flow_rate and self.radius is None:
             self.flow_area = self.mass_flow_rate/(self.freestream_velocity*self.total_state.rho_mass())
             self.radius = np.sqrt(self.flow_area/np.pi)
 
@@ -72,6 +83,11 @@ class FlowState:
     def freestream_velocity(self) -> float:
         "freestream velocity (m/s)"
         return self.mach_number*self.total_state.speed_of_sound_mass()  # type: ignore
+
+    @cached_property
+    def total_state(self) -> EquilibriumState:
+        "static state of fluid in passage"
+        return self.flasher.flash(T=self.total_temperature, P=self.total_pressure)
 
     @cached_property
     def static_state(self) -> EquilibriumState:
