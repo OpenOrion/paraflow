@@ -44,13 +44,13 @@ class SymmetricPassage(Passage):
         self.symetry_line = np.array([[0.0, 0.0], [self.axial_length, 0.0]])
 
         if self.area_ratio is not None:
-            self.outlet_length = self.area_ratio*self.inlet_radius
-            self.exit_angle = np.arctan((self.outlet_length - self.inlet_radius)/self.axial_length)
+            self.outlet_radius = self.area_ratio*self.inlet_radius
+            self.exit_angle = np.arctan((self.outlet_radius - self.inlet_radius)/self.axial_length)
         else:
             assert self.contour_angles is not None, "must specify contour angles if area ratio is not specified"
             self.exit_angle = self.contour_angles[-1]
-            self.outlet_length = np.tan(self.exit_angle)*self.axial_length + self.inlet_radius
-            self.area_ratio = self.outlet_length/self.inlet_radius
+            self.outlet_radius = np.tan(self.exit_angle)*self.axial_length + self.inlet_radius
+            self.area_ratio = self.outlet_radius/self.inlet_radius
 
         if self.contour_props and self.contour_angles:
             assert len(self.contour_props) == len(self.contour_angles), "must specify same number of contour props and angles"
@@ -73,12 +73,12 @@ class SymmetricPassage(Passage):
             [
                 [0.0, self.inlet_radius],
                 *contour_ctrl_pnts,
-                [self.axial_length, self.outlet_length]
+                [self.axial_length, self.outlet_radius]
             ]
         )
 
         self.inlet_length = self.inlet_radius
-        self.outlet_length = self.outlet_length
+        self.outlet_length = self.outlet_radius
 
     def get_contour_line(self, num_points=50):
         contour_bspline = get_bspline(self.ctrl_pnts, 3)
@@ -132,7 +132,7 @@ class SymmetricPassage(Passage):
         if show:
             fig.show()
 
-    def get_config(self, inflow: FlowState, target_outflow_static_pressure: float, working_directory: str, id: str):
+    def get_config(self, inflow: FlowState, outflow: FlowState, working_directory: str, id: str):
         return {
             "SOLVER": "RANS",
             "KIND_TURB_MODEL": "SST",
@@ -144,8 +144,8 @@ class SymmetricPassage(Passage):
             "SIDESLIP_ANGLE": 0.0,
             "INIT_OPTION": "TD_CONDITIONS",
             "FREESTREAM_OPTION": "TEMPERATURE_FS",
-            "FREESTREAM_PRESSURE": inflow.total_state.P,
-            "FREESTREAM_TEMPERATURE": inflow.total_state.T,
+            "FREESTREAM_PRESSURE": inflow.total_pressure,
+            "FREESTREAM_TEMPERATURE": inflow.total_temperature,
             "REF_DIMENSIONALIZATION": "DIMENSIONAL",
             "FLUID_MODEL": "PR_GAS",
             "GAMMA_VALUE": inflow.gamma,
@@ -159,7 +159,7 @@ class SymmetricPassage(Passage):
             "THERMAL_CONDUCTIVITY_CONSTANT": inflow.total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
             "MARKER_SYM": "symmetry",
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_state.P}, {inflow.total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {target_outflow_static_pressure}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_pressure}, {inflow.total_temperature}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {outflow.total_pressure}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",
