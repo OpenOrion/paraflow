@@ -93,8 +93,8 @@ class AnnularPassage(Passage):
             fig.show()
 
     @staticmethod
-    def get_config(inflow: FlowState, working_directory: str, id: str):
-        config = SymmetricPassage.get_config(inflow, working_directory, id)
+    def get_config(inflow: FlowState, target_outflow_static_pressure: float, working_directory: str, id: str):
+        config = SymmetricPassage.get_config(inflow, target_outflow_static_pressure, working_directory, id)
         del config["MARKER_SYM"]
         return config
 
