@@ -4,47 +4,13 @@ from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
 from thermo.phases import DryAirLemmon
 from thermo.chemical_package import lemmon2000_constants, lemmon2000_correlations
-from thermo import EquilibriumState, FlashPureVLS, ChemicalConstantsPackage, CEOSLiquid, CEOSGas, SRKMIX
+from thermo import EquilibriumState, FlashPureVLS, ChemicalConstantsPackage, CEOSLiquid, CEOSGas, SRKMIX, default_settings
 from chemicals import mixing_simple
-from thermo import EquilibriumState
+from thermo import EquilibriumState, Flash
 
 R = 8.31446261815324
 
-@lru_cache(maxsize=None)
-def get_flasher(
-    fluid_type: Union[str, List[str]],
-    state_type: Literal["gas", "liquid"],
-):
-    if fluid_type == "air":
-        gas = DryAirLemmon(T=np.nan, P=np.nan)
-        liquid = []
-        constants, correlations = lemmon2000_constants, lemmon2000_correlations
-    else:
-        constants, correlations = ChemicalConstantsPackage.from_IDs(IDs=fluid_type if isinstance(fluid_type, list) else [fluid_type])
-        eos_kwargs = dict(Tcs=constants.Tcs, Pcs=constants.Pcs, omegas=constants.omegas)
-        gas, liquid = [], []
-        if state_type == "liquid":
-            liquid = CEOSLiquid(SRKMIX, HeatCapacityGases=correlations.HeatCapacityGases, eos_kwargs=eos_kwargs)
-        else:
-            gas = CEOSGas(SRKMIX, HeatCapacityGases=correlations.HeatCapacityGases, eos_kwargs=eos_kwargs)
-
-    return FlashPureVLS(constants=constants, correlations=correlations, gas=gas, liquids=liquid, solids=[])
-
-
-@dataclass
-class FlowState:
-    fluid_type: Union[str, List[str]]
-    "fluid type"
-
-    state_type: Literal["gas", "liquid"]
-    "fluid state"
-
-    total_pressure: Optional[float] = None
-    "total pressure (Pa)"
-
-    total_temperature: float = 293.15
-    "total temperature (K)"
-
+class FlowState(EquilibriumState):
     mach_number: Optional[float] = None
     "freestream mach number (dimensionless)"
 
@@ -60,69 +26,39 @@ class FlowState:
     translation_velocity: Optional[float] = None
     "translation velocity of flow passage (m/s)"
 
-    total_state: EquilibriumState = field(init=False)
+    flasher: "FlowFlashPureVLS"
     "flasher object"
 
-    def __post_init__(self):
-        if self.total_temperature and self.total_pressure:
-            self.flasher = get_flasher(self.fluid_type, self.state_type) # type: ignore        
-            self.total_state = self.flasher.flash(T=self.total_temperature, P=self.total_pressure)
-            self.initialize(self.total_state)
 
-    def initialize(self, total_state: EquilibriumState):
-        self.total_state = total_state
-        self.total_pressure = self.total_state.P
-        self.total_temperature = self.total_state.T
+    def __init__(self, T, P, zs, gas, liquids, solids, betas, mach_number=None, mass_flow_rate=None, absolute_angle=None, radius=None, translational_velocity=None, flash_specs=None, flash_convergence=None, constants=None, correlations=None, flasher=None, settings=...):
+        super().__init__(T, P, zs, gas, liquids, solids, betas, flash_specs, flash_convergence, constants, correlations, flasher, settings)
+        self.mach_number = mach_number
+        self.mass_flow_rate = mass_flow_rate
+        self.absolute_angle = absolute_angle
+        self.radius = radius
+        self.translation_velocity = translational_velocity
 
-        self.gamma = cast(float, self.total_state.Cp_Cv_ratio())  # type: ignore
+        self.gamma = cast(float, self.Cp_Cv_ratio())  # type: ignore
         if self.radius:
             self.flow_area = np.pi*self.radius**2
             if self.mass_flow_rate and self.mach_number is None:
-                self.freestream_velocity = self.mass_flow_rate/(self.flow_area*self.total_state.rho_mass())
-                self.mach_number = self.freestream_velocity/self.total_state.speed_of_sound_mass()  # type: ignore
+                self.freestream_velocity = self.mass_flow_rate/(self.flow_area*self.rho_mass())
+                self.mach_number = self.freestream_velocity/self.speed_of_sound_mass()  # type: ignore
             else:
-                self.mass_flow_rate = self.flow_area*self.freestream_velocity*self.total_state.rho_mass()
+                self.mass_flow_rate = self.flow_area*self.freestream_velocity*self.rho_mass()
         elif self.mass_flow_rate and self.radius is None:
-            self.flow_area = self.mass_flow_rate/(self.freestream_velocity*self.total_state.rho_mass())
+            self.flow_area = self.mass_flow_rate/(self.freestream_velocity*self.rho_mass())
             self.radius = np.sqrt(self.flow_area/np.pi)
-
-    def clone(
-        self,
-        total_state: EquilibriumState,
-        mach_number: Optional[float] = None,
-        mass_flow_rate: Optional[float] = None,
-        radius: Optional[float] = None,
-        absolute_angle: Optional[float] = None,
-        translation_velocity: Optional[float] = None,
-    ):   
-        flow_state = FlowState(
-            fluid_type=self.fluid_type,
-            state_type=self.state_type,
-            mach_number=mach_number,
-            mass_flow_rate=mass_flow_rate,
-            radius=radius,
-            absolute_angle=absolute_angle,
-            translation_velocity=translation_velocity,
-        )
-        flow_state.initialize(total_state)
-        return flow_state
 
     @cached_property
     def gas_constant(self):
-        molar_weight = cast(float, mixing_simple(self.total_state.zs, self.total_state.constants.MWs))     # type: ignore
+        molar_weight = cast(float, mixing_simple(self.zs, self.constants.MWs))     # type: ignore
         return R * 1000 / molar_weight
 
     @cached_property
     def freestream_velocity(self) -> float:
         "freestream velocity (m/s)"
-        return self.mach_number*self.total_state.speed_of_sound_mass()  # type: ignore
-
-    @cached_property
-    def static_state(self) -> EquilibriumState:
-        "static state of fluid in passage"
-        static_temperature = self.total_state.T - (self.freestream_velocity**2)/(2*self.total_state.Cp_mass())  # type: ignore
-        static_pressure = self.total_state.P*(static_temperature/self.total_state.T)**(self.gamma/(self.gamma - 1))
-        return self.flasher.flash(T=static_temperature, P=static_pressure)
+        return self.mach_number*self.speed_of_sound_mass()  # type: ignore
 
     @cached_property
     def absolute_tangential_velocity(self):
@@ -152,3 +88,34 @@ class FlowState:
     def relative_velocity(self):
         "relative flow velocity (m/s)"
         return self.freestream_velocity/np.cos(self.relative_angle)
+
+
+class FlowFlashPureVLS(FlashPureVLS):
+    def __init__(self, constants, correlations, gas, liquids, solids, settings=default_settings):
+        super().__init__(constants, correlations, gas, liquids, solids, settings)
+
+    def flash(self, mach_number=None, mass_flow_rate=None, absolute_angle=None, radius=None, translational_velocity=None, zs=None, T=None, P=None, VF=None, SF=None, V=None, H=None, S=None, G=None, U=None, A=None, solution=None, hot_start=None, retry=False, dest=None, rho=None, rho_mass=None, H_mass=None, S_mass=None, G_mass=None, U_mass=None, A_mass=None, spec_fun=None):
+        eq_state = super().flash(zs, T, P, VF, SF, V, H, S, G, U, A, solution, hot_start, retry, dest, rho, rho_mass, H_mass, S_mass, G_mass, U_mass, A_mass, spec_fun)
+        flow_state =  FlowState(eq_state.T, eq_state.P, eq_state.zs, eq_state.gas, eq_state.liquids, eq_state.solids, eq_state.betas, mach_number, mass_flow_rate, absolute_angle, radius, translational_velocity, eq_state.flash_specs, eq_state.flash_convergence, eq_state.constants, eq_state.correlations, eq_state.flasher, eq_state.settings)
+        flow_state.flasher = self
+        return flow_state
+
+@lru_cache(maxsize=None)
+def get_flasher(
+    fluid_type: Union[str, List[str]],
+    state_type: Literal["gas", "liquid"],
+):
+    if fluid_type == "air":
+        gas = DryAirLemmon(T=np.nan, P=np.nan)
+        liquid = []
+        constants, correlations = lemmon2000_constants, lemmon2000_correlations
+    else:
+        constants, correlations = ChemicalConstantsPackage.from_IDs(IDs=fluid_type if isinstance(fluid_type, list) else [fluid_type])
+        eos_kwargs = dict(Tcs=constants.Tcs, Pcs=constants.Pcs, omegas=constants.omegas)
+        gas, liquid = [], []
+        if state_type == "liquid":
+            liquid = CEOSLiquid(SRKMIX, HeatCapacityGases=correlations.HeatCapacityGases, eos_kwargs=eos_kwargs)
+        else:
+            gas = CEOSGas(SRKMIX, HeatCapacityGases=correlations.HeatCapacityGases, eos_kwargs=eos_kwargs)
+
+    return FlowFlashPureVLS(constants=constants, correlations=correlations, gas=gas, liquids=liquid, solids=[])
