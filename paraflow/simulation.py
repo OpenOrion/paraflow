@@ -96,7 +96,7 @@ def run_simulation(
                     freestream_velocity = np.sqrt(velocity_x**2 + velocity_y**2)
                     mach_number = freestream_velocity / sound_speed
 
-                    target_values[target_name] = inflow.clone(temperature, pressure, mach_number, radius=passage.outlet_length)
+                    target_values[target_name] = FlowState(inflow.fluid_type, inflow.state_type, temperature, pressure, mach_number, radius=passage.outlet_length)
 
     # Output the solution to file
     SU2Driver.Output(0)
