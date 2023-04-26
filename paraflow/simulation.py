@@ -1,7 +1,5 @@
 from typing import Dict, Type, Any
 import numpy as np
-import pysu2
-from mpi4py import MPI
 from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
 from paraflow.flow_state import FlowState
@@ -29,14 +27,17 @@ def setup_simulation(
 @ray.remote
 def run_simulation(
     passage: Passage,
-    inflow: FlowState,
-    outflow: FlowState,
+    inlet_total_state: FlowState,
+    outlet_static_state: FlowState,
     working_directory: str,
     id: str,
     driver: Type[Any] = pysu2.CSinglezoneDriver,  # type: ignore
 ):
+    import pysu2
+    from mpi4py import MPI
+
     config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(inflow, outflow, working_directory, id)
+    config = passage.get_config(inlet_total_state, outlet_static_state, working_directory, id)
     mesh = passage.get_mesh()
     setup_simulation(mesh, config, config_path)
 
@@ -96,7 +97,7 @@ def run_simulation(
                     freestream_velocity = np.sqrt(velocity_x**2 + velocity_y**2)
                     mach_number = freestream_velocity / sound_speed
 
-                    target_values[target_name] = inflow.flasher.flash(T=temperature, P=pressure, mach_number=mach_number, radius=passage.outlet_length)
+                    target_values[target_name] = inlet_total_state.flasher.flash(T=temperature, P=pressure, mach_number=mach_number, radius=passage.outlet_length)
 
     # Output the solution to file
     SU2Driver.Output(0)

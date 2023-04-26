@@ -13,8 +13,6 @@ setup(
     "numpy",
     "scipy",
     "ezmesh @ git+https://github.com/Turbodesigner/ezmesh.git",
-    "pysu2 @ git+https://github.com/Turbodesigner/pysu2.git",
-    "mpi4py",
     "pymoo",
     "thermo",
     "ray[default]"
