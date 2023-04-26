@@ -1,4 +1,4 @@
-from typing import Dict, Type, Any
+from typing import Dict, Type, Any, Optional
 import numpy as np
 from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
@@ -31,10 +31,13 @@ def run_simulation(
     outlet_static_state: FlowState,
     working_directory: str,
     id: str,
-    driver: Type[Any] = pysu2.CSinglezoneDriver,  # type: ignore
+    driver: Optional[Type[Any]] = None,  # type: ignore
 ):
     import pysu2
     from mpi4py import MPI
+
+    if driver is None:
+        driver = pysu2.CSinglezoneDriver
 
     config_path = f"{working_directory}/config{id}.cfg"
     config = passage.get_config(inlet_total_state, outlet_static_state, working_directory, id)
