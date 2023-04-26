@@ -12,14 +12,15 @@ import ray
 def setup_simulation(
     mesh: Mesh,
     config: Dict,
-    save_path: str,
+    config_path: str,
 ):
-    with open(save_path, "w") as f:
+    config_path_directory = config_path.split("/")[0]
+    with open(config_path, "w") as f:
         for key, value in config.items():
             f.write(f"{key}= {value}\n")
             if key == "CONFIG_LIST":
                 for zone_config_save_path, zone_config_dict in config.items():
-                    with open(zone_config_save_path, "w") as f:
+                    with open(f"{config_path_directory}/{zone_config_save_path}", "w") as f:
                         for zone_config_key, zone_config_value in zone_config_dict.items():
                             f.write(f"{zone_config_key}= {zone_config_value}\n")
         export_to_su2(mesh, config['MESH_FILENAME'])
@@ -95,7 +96,7 @@ def run_simulation(
                     freestream_velocity = np.sqrt(velocity_x**2 + velocity_y**2)
                     mach_number = freestream_velocity / sound_speed
 
-                    target_values[target_name] = FlowState(inflow.fluid_type, inflow.state_type, temperature, pressure, mach_number, radius=passage.outlet_length)
+                    target_values[target_name] = inflow.clone(temperature, pressure, mach_number, radius=passage.outlet_length)
 
     # Output the solution to file
     SU2Driver.Output(0)

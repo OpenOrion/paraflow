@@ -1,14 +1,14 @@
 from typing import List, Literal, Optional, Union, cast
 import numpy as np
-from dataclasses import dataclass
-from functools import cached_property
+from dataclasses import dataclass, field
+from functools import cached_property, lru_cache
 from thermo.phases import DryAirLemmon
 from thermo.chemical_package import lemmon2000_constants, lemmon2000_correlations
 from thermo import EquilibriumState, FlashPureVLS, ChemicalConstantsPackage, CEOSLiquid, CEOSGas, SRKMIX
 from chemicals import R, mixing_simple
 from thermo import EquilibriumState
 
-
+@lru_cache(maxsize=None)
 def get_flasher(
     fluid_type: Union[str, List[str]],
     state_type: Literal["gas", "liquid"],
@@ -58,11 +58,14 @@ class FlowState:
     translation_velocity: Optional[float] = None
     "translation velocity of flow passage (m/s)"
 
-    def __post_init__(self) -> None:
-        self.flasher = get_flasher(self.fluid_type, self.state_type)
-        self.total_state = self.flasher.flash(T=self.total_temperature, P=self.total_pressure)
-        self.gamma = cast(float, self.total_state.Cp_Cv_ratio())  # type: ignore
+    total_state: EquilibriumState = field(init=False)
+    "flasher object"
 
+    def __post_init__(self):
+        if 'total_state' not in self.__dict__:
+            self.flasher = get_flasher(self.fluid_type, self.state_type) # type: ignore        
+            self.total_state = self.flasher.flash(T=self.total_temperature, P=self.total_pressure)
+        self.gamma = cast(float, self.total_state.Cp_Cv_ratio())  # type: ignore
         if self.radius:
             self.flow_area = np.pi*self.radius**2
             if self.mass_flow_rate and self.mach_number is None:
@@ -74,6 +77,29 @@ class FlowState:
             self.flow_area = self.mass_flow_rate/(self.freestream_velocity*self.total_state.rho_mass())
             self.radius = np.sqrt(self.flow_area/np.pi)
 
+    def clone(
+        self,
+        total_pressure: float,
+        total_temperature: float = 293.15,
+        mach_number: Optional[float] = None,
+        mass_flow_rate: Optional[float] = None,
+        radius: Optional[float] = None,
+        absolute_angle: Optional[float] = None,
+        translation_velocity: Optional[float] = None,
+    ):   
+        return FlowState(
+            fluid_type=self.fluid_type,
+            state_type=self.state_type,
+            total_pressure=total_pressure,
+            total_temperature=total_temperature,
+            mach_number=mach_number,
+            mass_flow_rate=mass_flow_rate,
+            radius=radius,
+            absolute_angle=absolute_angle,
+            translation_velocity=translation_velocity,
+        )
+
+
     @cached_property
     def gas_constant(self):
         molar_weight = cast(float, mixing_simple(self.total_state.zs, self.total_state.constants.MWs))     # type: ignore
@@ -83,11 +109,6 @@ class FlowState:
     def freestream_velocity(self) -> float:
         "freestream velocity (m/s)"
         return self.mach_number*self.total_state.speed_of_sound_mass()  # type: ignore
-
-    @cached_property
-    def total_state(self) -> EquilibriumState:
-        "static state of fluid in passage"
-        return self.flasher.flash(T=self.total_temperature, P=self.total_pressure)
 
     @cached_property
     def static_state(self) -> EquilibriumState:
