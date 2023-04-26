@@ -132,34 +132,34 @@ class SymmetricPassage(Passage):
         if show:
             fig.show()
 
-    def get_config(self, inflow: FlowState, outflow: FlowState, working_directory: str, id: str):
+    def get_config(self, inlet_total_state: FlowState, outflow_static_state: FlowState, working_directory: str, id: str):
         return {
             "SOLVER": "RANS",
             "KIND_TURB_MODEL": "SST",
             "MATH_PROBLEM": "DIRECT",
             "RESTART_SOL": "NO",
             "SYSTEM_MEASUREMENTS": "SI",
-            "MACH_NUMBER": inflow.mach_number,
+            "MACH_NUMBER": inlet_total_state.mach_number,
             "AOA": 0.0,
             "SIDESLIP_ANGLE": 0.0,
             "INIT_OPTION": "TD_CONDITIONS",
             "FREESTREAM_OPTION": "TEMPERATURE_FS",
-            "FREESTREAM_PRESSURE": inflow.total_pressure,
-            "FREESTREAM_TEMPERATURE": inflow.total_temperature,
+            "FREESTREAM_PRESSURE": inlet_total_state.P,
+            "FREESTREAM_TEMPERATURE": inlet_total_state.T,
             "REF_DIMENSIONALIZATION": "DIMENSIONAL",
             "FLUID_MODEL": "PR_GAS",
-            "GAMMA_VALUE": inflow.gamma,
-            "GAS_CONSTANT": inflow.gas_constant,
-            "CRITICAL_TEMPERATURE": inflow.total_state.pseudo_Tc(),
-            "CRITICAL_PRESSURE": inflow.total_state.pseudo_Pc(),
-            "ACENTRIC_FACTOR": inflow.total_state.pseudo_omega(),
+            "GAMMA_VALUE": inlet_total_state.gamma,
+            "GAS_CONSTANT": inlet_total_state.gas_constant,
+            "CRITICAL_TEMPERATURE": inlet_total_state.pseudo_Tc(),
+            "CRITICAL_PRESSURE": inlet_total_state.pseudo_Pc(),
+            "ACENTRIC_FACTOR": inlet_total_state.pseudo_omega(),
             "VISCOSITY_MODEL": "CONSTANT_VISCOSITY",
-            "MU_CONSTANT": inflow.total_state.mu(),                                  # type: ignore
+            "MU_CONSTANT": inlet_total_state.mu(),                                  # type: ignore
             "CONDUCTIVITY_MODEL": "CONSTANT_CONDUCTIVITY",
-            "THERMAL_CONDUCTIVITY_CONSTANT": inflow.total_state.k(),                 # type: ignore
+            "THERMAL_CONDUCTIVITY_CONSTANT": inlet_total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
             "MARKER_SYM": "symmetry",
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inflow.total_pressure}, {inflow.total_temperature}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {outflow.total_pressure}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inlet_total_state.T}, {inlet_total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {outflow_static_state.P}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",
