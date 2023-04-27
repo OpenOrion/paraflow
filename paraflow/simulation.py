@@ -5,22 +5,26 @@ from ezmesh.exporters import export_to_su2
 from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
 import ray
-
+import pathlib
 
 def setup_simulation(
     mesh: Mesh,
     config: Dict,
     config_path: str,
 ):
-    config_path_directory = config_path.split("/")[0]
-    with open(config_path, "w") as f:
+    config_path_directory = pathlib.Path(config_path).parent
+    with open(config_path, "w") as fp_config:
         for key, value in config.items():
-            f.write(f"{key}= {value}\n")
             if key == "CONFIG_LIST":
-                for zone_config_save_path, zone_config_dict in config.items():
-                    with open(f"{config_path_directory}/{zone_config_save_path}", "w") as f:
+                assert isinstance(value, dict)
+                for zone_config_save_path, zone_config_dict in value.items():
+                    with open(f"{config_path_directory}/{zone_config_save_path}", "w") as fp_zone_config:
                         for zone_config_key, zone_config_value in zone_config_dict.items():
-                            f.write(f"{zone_config_key}= {zone_config_value}\n")
+                            fp_zone_config.write(f"{zone_config_key}= {zone_config_value}\n")
+                fp_config.write(f"CONFIG_LIST= ({','.join(f'{config_path_directory}/{zone_config_path}' for zone_config_path in value.keys())})\n")
+            else:
+                fp_config.write(f"{key}= {value}\n")
+
         export_to_su2(mesh, config['MESH_FILENAME'])
 
 
@@ -49,7 +53,7 @@ def run_simulation(
     rank = comm.Get_rank()
 
     # Initialize the corresponding driver of SU2, this includes solver preprocessing
-    SU2Driver: pysu2.CFluidDriver = driver(config_path, 1, comm)
+    SU2Driver: pysu2.CFluidDriver = driver(config_path, 1, comm) # type: ignore
 
     # Get all the markers defined on this rank and their associated indices.
     allMarkerIDs = SU2Driver.GetMarkerIndices()
