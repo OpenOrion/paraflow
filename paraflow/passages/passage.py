@@ -6,12 +6,6 @@ import json
 
 
 class Passage(Protocol):
-    inlet_length: float
-    "inlet length (m)"
-
-    outlet_length: float
-    "outlet length (m)"
-
     def get_mesh(self, mesh_size: float = 0.01) -> Mesh:  # type: ignore
         pass
 
