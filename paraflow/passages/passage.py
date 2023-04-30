@@ -12,7 +12,7 @@ class Passage(Protocol):
     def visualize(self, title: str = "Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         pass
 
-    def get_config(self, inlet_total_state: FlowState, outlet_static_state: FlowState, working_directory: str, id: str) -> Dict[str, Any]:  # type: ignore
+    def get_config(self, inlet_total_state: FlowState, working_directory: str, id: str, target_outlet_static_state: Optional[FlowState] = None) -> Dict[str, Any]:  # type: ignore
         pass
 
     def to_dict(self) -> Dict[str, Any]:  # type: ignore

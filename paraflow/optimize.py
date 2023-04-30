@@ -85,10 +85,10 @@ class PassageOptimizer(ElementwiseProblem):
 
             sim_results = run_simulation(
                 passage,
-                self.inlet_total_state,
-                self.outlet_static_state,
-                self.working_directory,
-                f"{self.iteration}"
+                inlet_total_state=self.inlet_total_state,
+                outlet_static_state=self.outlet_static_state,
+                working_directory=self.working_directory,
+                id=f"{self.iteration}"
             )
             passage.visualize(f"passage{self.iteration}", show=False, save_path=f"{self.working_directory}/passage{self.iteration}.png")
             objectives = []

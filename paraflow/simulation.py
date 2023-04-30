@@ -28,7 +28,7 @@ def setup_simulation(
         export_to_su2(meshes, config['MESH_FILENAME'])
 
 @ray.remote
-def execute_su2(meshes: List[Mesh], config_path: str, driver: Type[Any], inlet_total_state: FlowState, outlet_static_state: FlowState):
+def execute_su2(meshes: List[Mesh], config_path: str, inlet_total_state: FlowState, outlet_static_state: Optional[FlowState], driver: Optional[Type[Any]]):
     import pysu2
     from mpi4py import MPI
 
@@ -41,9 +41,6 @@ def execute_su2(meshes: List[Mesh], config_path: str, driver: Type[Any], inlet_t
     num_zones = len(meshes)
     # Initialize the corresponding driver of SU2, this includes solver preprocessing
     SU2Driver: pysu2.CFluidDriver = driver(config_path, num_zones, comm) # type: ignore
-
-    # Get all the markers defined on this rank and their associated indices.
-    allMarkerIDs = SU2Driver.GetMarkerIndices()
 
     primitiveIndices = SU2Driver.GetPrimitiveIndices()  # maps primitive names to their indices.
     temperatureIndex = primitiveIndices["TEMPERATURE"]
@@ -60,7 +57,6 @@ def execute_su2(meshes: List[Mesh], config_path: str, driver: Type[Any], inlet_t
 
     # Time iteration preprocessing
     SU2Driver.Preprocess(0)
-
     # Run one time-step (static: one simulation)
     SU2Driver.Run()
 
@@ -71,7 +67,10 @@ def execute_su2(meshes: List[Mesh], config_path: str, driver: Type[Any], inlet_t
     SU2Driver.Monitor(0)
 
     target_values: Dict[str, FlowState] = {}
-    for mesh in meshes:
+    for izone, mesh in enumerate(meshes):
+        # SU2Driver.SelectZone(izone) # TODO: coming soon in next pysu2
+        # Get all the markers defined on this rank and their associated indices.
+        allMarkerIDs = SU2Driver.GetMarkerIndices()
         for marker_name, target in mesh.target_points.items():
             marker_id = allMarkerIDs[marker_name]
             nVertex_Marker = SU2Driver.GetNumberMarkerNodes(marker_id)
@@ -92,7 +91,7 @@ def execute_su2(meshes: List[Mesh], config_path: str, driver: Type[Any], inlet_t
                         freestream_velocity = np.sqrt(velocity_x**2 + velocity_y**2)
                         mach_number = freestream_velocity / sound_speed
 
-                        target_values[target_name] = inlet_total_state.flasher.flash(T=temperature, P=pressure, mach_number=mach_number, radius=outlet_static_state.radius)
+                        target_values[target_name] = inlet_total_state.flasher.flash(T=temperature, P=pressure, mach_number=mach_number, radius=outlet_static_state.radius if outlet_static_state else None)
 
     # Output the solution to file
     SU2Driver.Output(0)
@@ -105,23 +104,17 @@ def execute_su2(meshes: List[Mesh], config_path: str, driver: Type[Any], inlet_t
 def run_simulation(
     passage: Passage,
     inlet_total_state: FlowState,
-    outlet_static_state: FlowState,
     working_directory: str,
     id: str,
+    outlet_static_state: Optional[FlowState] = None,
     driver: Optional[Type[Any]] = None,  # type: ignore
 ):
-    import pysu2
-    from mpi4py import MPI
-
-    if driver is None:
-        driver = pysu2.CSinglezoneDriver
-
     config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(inlet_total_state, outlet_static_state, working_directory, id)
+    config = passage.get_config(inlet_total_state, working_directory, id, outlet_static_state)
     meshes = passage.get_mesh()
     if not isinstance(meshes, list):
         meshes = [meshes]
     setup_simulation(meshes, config, config_path)
-    remote_result = execute_su2.remote(meshes, config_path, driver, inlet_total_state, outlet_static_state)
+    remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, outlet_static_state, driver)
     sim_results = ray.get(remote_result)
     return sim_results
