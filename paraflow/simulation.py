@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Dict, List, Type, Any, Optional
 import numpy as np
 from ezmesh import Mesh
@@ -6,6 +7,14 @@ from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
 import ray
 import pathlib
+
+@dataclass
+class SimulationResult:
+    target_values: Dict[str, FlowState]
+    "values for marker target points"
+
+    eval_values: Dict[str, float]
+    "values for provided eval attributes"
 
 def setup_simulation(
     meshes: List[Mesh],
@@ -28,7 +37,14 @@ def setup_simulation(
         export_to_su2(meshes, config['MESH_FILENAME'])
 
 @ray.remote
-def execute_su2(meshes: List[Mesh], config_path: str, inlet_total_state: FlowState, outlet_static_state: Optional[FlowState], driver: Optional[Type[Any]]):
+def execute_su2(
+    meshes: List[Mesh], 
+    config_path: str, 
+    inlet_total_state: FlowState, 
+    outlet_static_state: Optional[FlowState], 
+    driver: Optional[Type[Any]],
+    eval_properties: Optional[List[str]] = None,
+):
     import pysu2
     from mpi4py import MPI
 
@@ -66,11 +82,22 @@ def execute_su2(meshes: List[Mesh], config_path: str, inlet_total_state: FlowSta
     # Monitor the solver and output solution to file if required
     SU2Driver.Monitor(0)
 
+
+
+    eval_values: Dict[str, List[float]] = {}
     target_values: Dict[str, FlowState] = {}
     for izone, mesh in enumerate(meshes):
         # SU2Driver.SelectZone(izone) # TODO: coming soon in next pysu2
         # Get all the markers defined on this rank and their associated indices.
         allMarkerIDs = SU2Driver.GetMarkerIndices()
+
+        if eval_properties:
+            for eval_property in eval_properties:
+                if eval_property not in eval_values:
+                    eval_values[eval_property] = []
+                eval_value = SU2Driver.GetOutputValue(eval_property)
+                eval_values[eval_property].append(eval_value)
+
         for marker_name, target in mesh.target_points.items():
             marker_id = allMarkerIDs[marker_name]
             nVertex_Marker = SU2Driver.GetNumberMarkerNodes(marker_id)
@@ -98,7 +125,7 @@ def execute_su2(meshes: List[Mesh], config_path: str, inlet_total_state: FlowSta
 
     # Finalize the solver and exit cleanly
     SU2Driver.Finalize()
-    return target_values
+    return SimulationResult(target_values, eval_values)
 
 
 def run_simulation(
@@ -106,6 +133,7 @@ def run_simulation(
     inlet_total_state: FlowState,
     working_directory: str,
     id: str,
+    eval_properties: Optional[List[str]] = None,
     outlet_static_state: Optional[FlowState] = None,
     driver: Optional[Type[Any]] = None,  # type: ignore
 ):
@@ -115,6 +143,6 @@ def run_simulation(
     if not isinstance(meshes, list):
         meshes = [meshes]
     setup_simulation(meshes, config, config_path)
-    remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, outlet_static_state, driver)
+    remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, outlet_static_state, driver, eval_properties)
     sim_results = ray.get(remote_result)
     return sim_results
