@@ -159,7 +159,7 @@ class SymmetricPassage(Passage):
             "THERMAL_CONDUCTIVITY_CONSTANT": inlet_total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
             "MARKER_SYM": "symmetry",
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inlet_total_state.T}, {inlet_total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {target_outlet_static_state.P}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inlet_total_state.P}, {inlet_total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {target_outlet_static_state.P}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",
