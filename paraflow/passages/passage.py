@@ -1,12 +1,11 @@
-from typing import Any, Dict, Optional, Protocol
-from ezmesh import Mesh
-import numpy as np
+from typing import Any, Dict, Optional, Protocol, Union
+from ezmesh import Mesh, PlaneSurface
 from paraflow.flow_state import FlowState
 import json
 
 
 class Passage(Protocol):
-    def get_mesh(self, mesh_size: float = 0.01) -> Mesh:  # type: ignore
+    def get_mesh(self) -> Union[Mesh | List[Mesh]]:  # type: ignore
         pass
 
     def visualize(self, title: str = "Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):

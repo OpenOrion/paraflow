@@ -3,11 +3,12 @@ from typing import Callable, Dict, List, Type, Any, Optional
 import numpy as np
 from scipy.interpolate import LinearNDInterpolator
 import matplotlib.pyplot as plt
-import numpy.typing as npt
 from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
 from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
+from shapely.geometry import Polygon
+from matplotlib import cm
 
 import ray
 import pathlib
@@ -35,7 +36,8 @@ class SimulationResult:
     eval_values: Dict[str, List[float]]
     "values for provided eval attributes"
 
-    def get_primitive_frame(self, primitive_property: str, num_pnts: int, size: Optional[float] = None):
+
+    def get_primitive_frame(self, passage: Passage, primitive_property: str, num_pnts: int, size: Optional[float] = None):
         points = np.array(self.points)
         primitive_values = np.array(self.primitive_values[primitive_property])
 
@@ -50,14 +52,12 @@ class SimulationResult:
         primitive_interp = interp(X, Y)
 
         plt.figure()
-        plt.pcolormesh(X, Y, primitive_interp, cmap=plt.cm.get_cmap("seismic"))
+        plt.pcolormesh(X, Y, primitive_interp, cmap=cm.get_cmap("seismic"))
         plt.colorbar() # Color Bar
         plt.show()
                 
         return np.array([X, Y, primitive_interp]).T
 
-
- 
 
 def setup_simulation(
     meshes: List[Mesh],
