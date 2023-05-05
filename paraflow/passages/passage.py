@@ -1,10 +1,11 @@
-from typing import Any, Dict, Optional, Protocol, Union
+from typing import Any, Dict, Optional, Protocol, Union, List
 from ezmesh import Mesh, PlaneSurface
 from paraflow.flow_state import FlowState
 import json
 
 
 class Passage(Protocol):
+    surface: PlaneSurface
     def get_mesh(self) -> Union[Mesh | List[Mesh]]:  # type: ignore
         pass
 

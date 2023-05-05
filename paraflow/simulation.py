@@ -7,7 +7,7 @@ from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
 from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 from matplotlib import cm
 
 import ray
@@ -50,6 +50,17 @@ class SimulationResult:
         )
         interp = LinearNDInterpolator(cartcoord, primitive_values, fill_value=0)
         primitive_interp = interp(X, Y)
+        
+
+        polygons = passage.surface.get_polygons()
+        for polygon in polygons:
+            for i in range(X.shape[0]):
+                for j in range(X.shape[1]):
+                    p = Point(X[i,j], Y[i,j])
+                    if not polygon.contains(p):
+                        primitive_interp[i,j] = 0
+
+
 
         plt.figure()
         plt.pcolormesh(X, Y, primitive_interp, cmap=cm.get_cmap("seismic"))

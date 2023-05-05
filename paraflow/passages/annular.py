@@ -1,10 +1,29 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from functools import cached_property
 from typing import Any, Dict, Optional
 import plotly.graph_objects as go
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
 from paraflow.passages.symmetric import SymmetricPassage
+
+
+@dataclass
+class AnnularPassageMeshParams:
+    mesh_size: float = 0.01
+    "mesh size"
+
+    wall_label: str = "wall"
+    "label for wall"
+
+    inflow_label: str = "inflow"
+    "label for inflow"
+
+    outflow_label: str = "outflow"
+    "label for outflow"
+
+    target_mid_outflow_label: str = "target_mid_outflow"
+    "label for target mid outflow"
 
 
 @dataclass
@@ -24,6 +43,9 @@ class AnnularPassage(Passage):
     shroud_angle: float
     "angles between shroud and symetry line (rad)"
 
+    mesh_params: AnnularPassageMeshParams = field(default_factory=AnnularPassageMeshParams)
+    "mesh parameters"
+
     def __post_init__(self):
         assert self.shroud_angle >= self.hub_angle, "shroud angle must be greater or equal to hub angle"
         self.hub_passage = SymmetricPassage(
@@ -38,36 +60,35 @@ class AnnularPassage(Passage):
             contour_angles=[self.shroud_angle, self.shroud_angle],
         )
 
-        self.inlet_length = self.inlet_shroud_radius
-        self.outlet_length = self.shroud_passage.outlet_length
+    @cached_property
+    def surface(self):
+        curve_loop = CurveLoop.from_coords(
+            [
+                ("BSpline", self.shroud_passage.ctrl_pnts),
+                ("BSpline", self.hub_passage.ctrl_pnts[::-1]),
+            ],
+            mesh_size=self.mesh_params.mesh_size,
+            curve_labels=[f"{self.mesh_params.wall_label}/top", self.mesh_params.outflow_label, f"{self.mesh_params.wall_label}/bottom", self.mesh_params.inflow_label],
+            fields=[
+                TransfiniteCurveField(
+                    node_counts={f"{self.mesh_params.wall_label}/*": 100, self.mesh_params.inflow_label: 100, self.mesh_params.outflow_label: 100},
+                    coefs={f"{self.mesh_params.wall_label}/*": 1.0, self.mesh_params.inflow_label: 1/1.1, self.mesh_params.outflow_label: 1.1}
+                )
+            ]
+        )
 
-    def get_mesh(self, mesh_size=0.01):
+        return PlaneSurface(
+            outlines=[curve_loop],
+            is_quad_mesh=True,
+            fields=[
+                TransfiniteSurfaceField(corners=curve_loop.get_points("wall"))
+            ],
+        )
+
+    def get_mesh(self):
         with Geometry() as geo:
-            curve_loop = CurveLoop.from_coords(
-                [
-                    ("BSpline", self.shroud_passage.ctrl_pnts),
-                    ("BSpline", self.hub_passage.ctrl_pnts[::-1]),
-                ],
-                mesh_size=mesh_size,
-                labels=["wall/top", "outflow", "wall/bottom", "inflow"],
-                fields=[
-                    TransfiniteCurveField(
-                        node_counts={"wall/*": 100, "inflow": 100, "outflow": 100},
-                        coefs={"wall/*": 1.0, "inflow": 1/1.1, "outflow": 1.1}
-                    )
-                ]
-            )
-
-            surface = PlaneSurface(
-                outlines=[curve_loop],
-                is_quad_mesh=True,
-                fields=[
-                    TransfiniteSurfaceField(corners=curve_loop.get_points("wall"))
-                ],
-            )
-
-            mesh = geo.generate(surface)
-            mesh.add_target_point("mid_outflow", "outflow", 0.5)
+            mesh = geo.generate(self.surface)
+            mesh.add_target_point(self.mesh_params.target_mid_outflow_label, self.mesh_params.outflow_label, 0.5)
             return mesh
 
     def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
@@ -93,7 +114,8 @@ class AnnularPassage(Passage):
             fig.show()
 
     def get_config(self, inlet_total_state: FlowState, working_directory: str, id: str, target_outlet_static_state: FlowState):
-        config = SymmetricPassage.get_config(None, inlet_total_state, working_directory, id, target_outlet_static_state) # type: ignore
+        self.mesh_params.symmetry_label = None # type: ignore
+        config = SymmetricPassage.get_config(self, inlet_total_state, working_directory, id, target_outlet_static_state) # type: ignore
         del config["MARKER_SYM"]
         return config
 

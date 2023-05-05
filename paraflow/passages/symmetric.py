@@ -121,32 +121,35 @@ class SymmetricPassage(Passage):
         contour_bspline = get_bspline(self.ctrl_pnts, 3)
         return contour_bspline(np.linspace(0, 1, num_points))
 
+    @cached_property
+    def surface(self):
+        curve_loop = CurveLoop.from_coords(
+            [
+                ("BSpline", self.ctrl_pnts),
+                self.symetry_line[::-1]
+            ],
+            mesh_size=self.mesh_params.mesh_size,
+            curve_labels=[self.mesh_params.wall_label, self.mesh_params.outflow_label, self.mesh_params.symmetry_label, self.mesh_params.inflow_label],
+            fields=[
+                TransfiniteCurveField(
+                    node_counts={self.mesh_params.wall_label: 100, self.mesh_params.inflow_label: 100, self.mesh_params.symmetry_label: 100, self.mesh_params.outflow_label: 100},
+                    coefs={self.mesh_params.wall_label: 1.0, self.mesh_params.inflow_label: 1/1.1, self.mesh_params.symmetry_label: 1.0, self.mesh_params.outflow_label: 1.1}
+                )
+            ]
+        )
+
+        return PlaneSurface(
+            outlines=[curve_loop],
+            is_quad_mesh=True,
+            fields=[
+                TransfiniteSurfaceField(corners=[*curve_loop.get_points(self.mesh_params.wall_label), *curve_loop.get_points(self.mesh_params.symmetry_label)])
+            ],
+        )
+
+
     def get_mesh(self):
         with Geometry() as geo:
-            curve_loop = CurveLoop.from_coords(
-                [
-                    ("BSpline", self.ctrl_pnts),
-                    self.symetry_line[::-1]
-                ],
-                mesh_size=self.mesh_params.mesh_size,
-                labels=[self.mesh_params.wall_label, self.mesh_params.outflow_label, self.mesh_params.symmetry_label, self.mesh_params.inflow_label],
-                fields=[
-                    TransfiniteCurveField(
-                        node_counts={self.mesh_params.wall_label: 100, self.mesh_params.inflow_label: 100, self.mesh_params.symmetry_label: 100, self.mesh_params.outflow_label: 100},
-                        coefs={self.mesh_params.wall_label: 1.0, self.mesh_params.inflow_label: 1/1.1, self.mesh_params.symmetry_label: 1.0, self.mesh_params.outflow_label: 1.1}
-                    )
-                ]
-            )
-
-            surface = PlaneSurface(
-                outlines=[curve_loop],
-                is_quad_mesh=True,
-                fields=[
-                    TransfiniteSurfaceField(corners=[*curve_loop.get_points(self.mesh_params.wall_label), *curve_loop.get_points(self.mesh_params.symmetry_label)])
-                ],
-            )
-
-            mesh = geo.generate(surface)
+            mesh = geo.generate(self.surface)
             mesh.add_target_point(self.mesh_params.target_top_outflow_label, self.mesh_params.outflow_label, 0)
             mesh.add_target_point(self.mesh_params.target_mid_outflow_label, self.mesh_params.outflow_label, 0.5)
             mesh.add_target_point(self.mesh_params.target_bottom_outflow_label, self.mesh_params.outflow_label, 1.0)
