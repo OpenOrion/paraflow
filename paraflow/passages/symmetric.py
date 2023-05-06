@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass, field
+from functools import cached_property
 from typing import Any, Dict, List, Optional
 import numpy as np
 import numpy.typing as npt
@@ -22,6 +23,33 @@ def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
     )
     return BSpline(knots, ctrl_pnts, degree, extrapolate=False)
 
+@dataclass
+class SymetricPassageMeshParams:
+    mesh_size: float = 0.01
+    "mesh size"
+
+    wall_label: str = "wall"
+    "label for wall"
+
+    inflow_label: str = "inflow"
+    "label for inflow"
+
+    outflow_label: str = "outflow"
+    "label for outflow"
+
+    symmetry_label: str = "symmetry"
+    "label for symmetry"
+
+    target_top_outflow_label: str = "target_top_outflow"
+    "label for target top outflow"
+
+    target_mid_outflow_label: str = "target_mid_outflow"
+    "label for target mid outflow"
+
+    target_bottom_outflow_label: str = "target_bottom_outflow"
+    "label for target bottom outflow"
+
+    
 
 @dataclass
 class SymmetricPassage(Passage):
@@ -40,8 +68,17 @@ class SymmetricPassage(Passage):
     area_ratio: Optional[float] = None
     "ratio of exit area to inlet area"
 
+    inlet_gap_length: float = 0.0
+    "length of inlet gap"
+
+    outlet_gap_length: float = 0.0
+    "length of outlet gap"
+
+    mesh_params: SymetricPassageMeshParams = field(default_factory=SymetricPassageMeshParams)
+    "mesh parameters"
+
     def __post_init__(self):
-        self.symetry_line = np.array([[0.0, 0.0], [self.axial_length, 0.0]])
+        self.symetry_line = np.array([[-self.inlet_gap_length, 0.0], [self.outlet_gap_length + self.axial_length, 0.0]])
 
         if self.area_ratio is not None:
             self.outlet_radius = self.area_ratio*self.inlet_radius
@@ -71,48 +108,51 @@ class SymmetricPassage(Passage):
 
         self.ctrl_pnts = np.array(
             [
+                *([[-self.inlet_gap_length, self.inlet_radius], [0.0, self.inlet_radius]] if self.inlet_gap_length else []),
                 [0.0, self.inlet_radius],
                 *contour_ctrl_pnts,
-                [self.axial_length, self.outlet_radius]
+                [self.axial_length, self.outlet_radius],
+                *([[self.axial_length, self.outlet_radius], [self.axial_length+self.outlet_gap_length, self.outlet_radius]] if self.outlet_gap_length else []),
+
             ]
         )
-
-        self.inlet_length = self.inlet_radius
-        self.outlet_length = self.outlet_radius
 
     def get_contour_line(self, num_points=50):
         contour_bspline = get_bspline(self.ctrl_pnts, 3)
         return contour_bspline(np.linspace(0, 1, num_points))
 
-    def get_mesh(self, mesh_size=0.01):
+    @cached_property
+    def surface(self):
+        curve_loop = CurveLoop.from_coords(
+            [
+                ("BSpline", self.ctrl_pnts),
+                self.symetry_line[::-1]
+            ],
+            mesh_size=self.mesh_params.mesh_size,
+            curve_labels=[self.mesh_params.wall_label, self.mesh_params.outflow_label, self.mesh_params.symmetry_label, self.mesh_params.inflow_label],
+            fields=[
+                TransfiniteCurveField(
+                    node_counts={self.mesh_params.wall_label: 100, self.mesh_params.inflow_label: 100, self.mesh_params.symmetry_label: 100, self.mesh_params.outflow_label: 100},
+                    coefs={self.mesh_params.wall_label: 1.0, self.mesh_params.inflow_label: 1/1.1, self.mesh_params.symmetry_label: 1.0, self.mesh_params.outflow_label: 1.1}
+                )
+            ]
+        )
+
+        return PlaneSurface(
+            outlines=[curve_loop],
+            is_quad_mesh=True,
+            fields=[
+                TransfiniteSurfaceField(corners=[*curve_loop.get_points(self.mesh_params.wall_label), *curve_loop.get_points(self.mesh_params.symmetry_label)])
+            ],
+        )
+
+
+    def get_mesh(self):
         with Geometry() as geo:
-            curve_loop = CurveLoop.from_coords(
-                [
-                    ("BSpline", self.ctrl_pnts),
-                    self.symetry_line[::-1]
-                ],
-                mesh_size=mesh_size,
-                labels=["wall", "outflow", "symmetry", "inflow"],
-                fields=[
-                    TransfiniteCurveField(
-                        node_counts={"wall": 100, "inflow": 100, "symmetry": 100, "outflow": 100},
-                        coefs={"wall": 1.0, "inflow": 1/1.1, "symmetry": 1.0, "outflow": 1.1}
-                    )
-                ]
-            )
-
-            surface = PlaneSurface(
-                outlines=[curve_loop],
-                is_quad_mesh=True,
-                fields=[
-                    TransfiniteSurfaceField(corners=[*curve_loop.get_points("wall"), *curve_loop.get_points("symmetry")])
-                ],
-            )
-
-            mesh = geo.generate(surface)
-            mesh.add_target_point("top_outflow", "outflow", 0)
-            mesh.add_target_point("mid_outflow", "outflow", 0.5)
-            mesh.add_target_point("bottom_outflow", "outflow", 1.0)
+            mesh = geo.generate(self.surface)
+            mesh.add_target_point(self.mesh_params.target_top_outflow_label, self.mesh_params.outflow_label, 0)
+            mesh.add_target_point(self.mesh_params.target_mid_outflow_label, self.mesh_params.outflow_label, 0.5)
+            mesh.add_target_point(self.mesh_params.target_bottom_outflow_label, self.mesh_params.outflow_label, 1.0)
             return mesh
 
     def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
@@ -132,7 +172,14 @@ class SymmetricPassage(Passage):
         if show:
             fig.show()
 
-    def get_config(self, inlet_total_state: FlowState, working_directory: str, id: str, target_outlet_static_state: FlowState):
+    def get_config(
+            self, 
+            inlet_total_state: FlowState, 
+            working_directory: str, 
+            id: str, 
+            target_outlet_static_state: FlowState,
+            angle_of_attack: float = 0.0
+        ):
         return {
             "SOLVER": "RANS",
             "KIND_TURB_MODEL": "SST",
@@ -140,7 +187,7 @@ class SymmetricPassage(Passage):
             "RESTART_SOL": "NO",
             "SYSTEM_MEASUREMENTS": "SI",
             "MACH_NUMBER": inlet_total_state.mach_number,
-            "AOA": 0.0,
+            "AOA": angle_of_attack,
             "SIDESLIP_ANGLE": 0.0,
             "INIT_OPTION": "TD_CONDITIONS",
             "FREESTREAM_OPTION": "TEMPERATURE_FS",
@@ -158,8 +205,8 @@ class SymmetricPassage(Passage):
             "CONDUCTIVITY_MODEL": "CONSTANT_CONDUCTIVITY",
             "THERMAL_CONDUCTIVITY_CONSTANT": inlet_total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
-            "MARKER_SYM": "symmetry",
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inlet_total_state.T}, {inlet_total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {target_outlet_static_state.P}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_SYM": self.mesh_params.symmetry_label,
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inlet_total_state.P}, {inlet_total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {target_outlet_static_state.P}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",

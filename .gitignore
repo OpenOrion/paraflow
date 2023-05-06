@@ -1,3 +1,4 @@
+*.pickle
 history.csv
 simulation/
 output/
