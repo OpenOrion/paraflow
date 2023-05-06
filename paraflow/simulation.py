@@ -1,18 +1,18 @@
+import pickle
+import ray
+import pathlib
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Type, Any, Optional
 import numpy as np
+import numpy.typing as npt
 from scipy.interpolate import LinearNDInterpolator
 import matplotlib.pyplot as plt
 from ezmesh import Mesh
 from ezmesh.exporters import export_to_su2
 from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage
-from shapely.geometry import Polygon, Point
 from matplotlib import cm
-
-import ray
-import pathlib
-
+from paraflow.utils import check_points_in_polygon
 
 def get_mach_number(iVertex: int, primitives: Callable, primitiveIndices: Dict[str, int]):
     velocity_x = primitives(iVertex, primitiveIndices["VELOCITY_X"])
@@ -21,10 +21,9 @@ def get_mach_number(iVertex: int, primitives: Callable, primitiveIndices: Dict[s
     freestream_velocity = np.sqrt(velocity_x**2 + velocity_y**2)
     return freestream_velocity / sound_speed
 
-
 @dataclass
 class SimulationResult:
-    points: List[np.ndarray]
+    points: List[List[float]]
     "points for provided point attributes"
 
     primitive_values: Dict[str, List[float]]
@@ -37,38 +36,51 @@ class SimulationResult:
     "values for provided eval attributes"
 
 
-    def get_primitive_frame(self, passage: Passage, primitive_property: str, num_pnts: int, size: Optional[float] = None):
-        points = np.array(self.points)
-        primitive_values = np.array(self.primitive_values[primitive_property])
+def get_primitive_frame(
+        sim_result: SimulationResult,
+        passage: Passage,
+        property_name: str,
+        num_pnts: int,
+        size: Optional[float] = None,
+        offset: Optional[npt.NDArray[np.float64]] = None,
+        num_spline_pnts: int = 20,
+        is_cosine_sampling: bool = True,
+        show: bool = False,
 
-        x = points[:, 0]
-        y = points[:, 1]
-        cartcoord = list(zip(x, y))
-        X, Y = np.meshgrid(
-            np.linspace(-size/2 if size else min(x), size/2 if size else max(x), num_pnts),
-            np.linspace(-size/2 if size else min(y), size/2 if size else max(y), num_pnts)
-        )
-        interp = LinearNDInterpolator(cartcoord, primitive_values, fill_value=0)
-        primitive_interp = interp(X, Y)
-        
+):
+    if offset is None:
+        offset = np.array([0, 0])
+    points_np = np.array(sim_result.points)
+    primitive_values = np.array(sim_result.primitive_values[property_name])
 
-        polygons = passage.surface.get_polygons()
-        for polygon in polygons:
-            for i in range(X.shape[0]):
-                for j in range(X.shape[1]):
-                    p = Point(X[i,j], Y[i,j])
-                    if not polygon.contains(p):
-                        primitive_interp[i,j] = 0
+    points_x = points_np[:, 0]
+    points_y = points_np[:, 1]
+    cartcoord = list(zip(points_x, points_y))
+    X, Y = np.meshgrid(
+        np.linspace(-size/2 if size else min(points_x), size/2 if size else max(points_x), num_pnts) + offset[0],
+        np.linspace(-size/2 if size else min(points_y), size/2 if size else max(points_y), num_pnts) + offset[1]
+    )
+    interp = LinearNDInterpolator(cartcoord, primitive_values, fill_value=0)
+    primitive_interp = interp(X, Y)
 
+    for outline in passage.surface.outlines:
+        coords = outline.get_exterior_coords(num_spline_pnts, is_cosine_sampling)
+        mask = check_points_in_polygon((X, Y), coords).astype(int)
+        primitive_interp = primitive_interp*mask
 
+    for hole in passage.surface.holes:
+        coords = hole.get_exterior_coords(num_spline_pnts, is_cosine_sampling)
+        mask = (~check_points_in_polygon((X, Y), coords)).astype(int)
+        primitive_interp = primitive_interp*mask
 
+    if show:
         plt.figure()
         plt.pcolormesh(X, Y, primitive_interp, cmap=cm.get_cmap("seismic"))
-        plt.colorbar() # Color Bar
+        plt.colorbar()
+        plt.axis('equal')
         plt.show()
-                
-        return np.array([X, Y, primitive_interp]).T
 
+    return np.array([X, Y, primitive_interp]).T
 
 def setup_simulation(
     meshes: List[Mesh],
@@ -128,7 +140,7 @@ def execute_su2(
     # Monitor the solver and output solution to file if required
     SU2Driver.Monitor(0)
 
-    points: List[np.ndarray] = []
+    points: List[List[float]] = []
     primitive_values: Dict[str, List[float]] = {}
     eval_values: Dict[str, List[float]] = {}
     target_values: Dict[str, FlowState] = {}
@@ -151,8 +163,7 @@ def execute_su2(
         if primitive_properties:
             coord_handler = SU2Driver.Coordinates()
             for iVertex in range(SU2Driver.GetNumberNodes()):
-                coord = np.array([coord_handler(iVertex, 0), coord_handler(iVertex, 1)])
-                points.append(coord)
+                points.append([coord_handler(iVertex, 0), coord_handler(iVertex, 1)])
                 for primitive_property in primitive_properties:
                     if primitive_property not in primitive_values:
                         primitive_values[primitive_property] = []
@@ -195,6 +206,7 @@ def run_simulation(
     primitive_properties: Optional[List[str]] = None,
     outlet_static_state: Optional[FlowState] = None,
     driver: Optional[Type[Any]] = None,  # type: ignore
+    save_path: Optional[str] = None
 ):
     config_path = f"{working_directory}/config{id}.cfg"
     config = passage.get_config(inlet_total_state, working_directory, id, outlet_static_state)
@@ -204,5 +216,10 @@ def run_simulation(
     setup_simulation(meshes, config, config_path)
     remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, eval_properties, primitive_properties, outlet_static_state, driver)
     sim_results = ray.get(remote_result)
+
+    if save_path:
+        with open(save_path, 'wb') as handle:
+            pickle.dump(sim_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 
     return sim_results

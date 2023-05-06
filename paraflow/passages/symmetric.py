@@ -172,7 +172,14 @@ class SymmetricPassage(Passage):
         if show:
             fig.show()
 
-    def get_config(self, inlet_total_state: FlowState, working_directory: str, id: str, target_outlet_static_state: FlowState):
+    def get_config(
+            self, 
+            inlet_total_state: FlowState, 
+            working_directory: str, 
+            id: str, 
+            target_outlet_static_state: FlowState,
+            angle_of_attack: float = 0.0
+        ):
         return {
             "SOLVER": "RANS",
             "KIND_TURB_MODEL": "SST",
@@ -180,7 +187,7 @@ class SymmetricPassage(Passage):
             "RESTART_SOL": "NO",
             "SYSTEM_MEASUREMENTS": "SI",
             "MACH_NUMBER": inlet_total_state.mach_number,
-            "AOA": 0.0,
+            "AOA": angle_of_attack,
             "SIDESLIP_ANGLE": 0.0,
             "INIT_OPTION": "TD_CONDITIONS",
             "FREESTREAM_OPTION": "TEMPERATURE_FS",

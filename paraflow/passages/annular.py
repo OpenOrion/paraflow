@@ -113,9 +113,15 @@ class AnnularPassage(Passage):
         if show:
             fig.show()
 
-    def get_config(self, inlet_total_state: FlowState, working_directory: str, id: str, target_outlet_static_state: FlowState):
+    def get_config(
+            self, 
+            inlet_total_state: FlowState, 
+            working_directory: str, id: str, 
+            target_outlet_static_state: FlowState, 
+            angle_of_attack: float = 0.0
+        ):
         self.mesh_params.symmetry_label = None # type: ignore
-        config = SymmetricPassage.get_config(self, inlet_total_state, working_directory, id, target_outlet_static_state) # type: ignore
+        config = SymmetricPassage.get_config(self, inlet_total_state, working_directory, id, target_outlet_static_state, angle_of_attack) # type: ignore
         del config["MARKER_SYM"]
         return config
 

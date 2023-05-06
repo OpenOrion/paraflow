@@ -15,6 +15,7 @@ setup(
     "ezmesh @ git+https://github.com/Turbodesigner/ezmesh.git",
     "pymoo",
     "thermo",
-    "ray[default]"
+    "ray[default]",
+    "matplotlib"
    ]
 )

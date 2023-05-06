@@ -95,7 +95,7 @@ class PassageOptimizer(ElementwiseProblem):
             for obj, direction in self.objectives:
                 sign = -1 if direction == "max" else 1
                 if obj == "mach":
-                    obj_val = cast(float, sim_results["mid_outflow"].mach_number)
+                    obj_val = cast(float, sim_results.target_values["mid_outflow"].mach_number)
                 else:
                     raise ValueError(f"Unknown objective {obj}")
                 objectives.append(sign * obj_val)
