@@ -36,6 +36,11 @@ class SimulationResult:
     "values for provided eval attributes"
 
 
+    @staticmethod
+    def from_file(file_path: str) -> "SimulationResult":
+        with open(file_path, 'rb') as handle:
+            return pickle.load(handle)
+
 def get_primitive_frame(
         sim_result: SimulationResult,
         passage: Passage,
@@ -108,10 +113,10 @@ def execute_su2(
     meshes: List[Mesh],
     config_path: str,
     inlet_total_state: FlowState,
+    driver: Optional[Type[Any]],
     eval_properties: Optional[List[str]],
     primitive_properties: Optional[List[str]],
     outlet_static_state: Optional[FlowState],
-    driver: Optional[Type[Any]],
 ):
     import pysu2
     from mpi4py import MPI
@@ -202,19 +207,20 @@ def run_simulation(
     inlet_total_state: FlowState,
     working_directory: str,
     id: str,
+    driver: Optional[Type[Any]] = None,  # type: ignore
+    save_path: Optional[str] = None,
     eval_properties: Optional[List[str]] = None,
     primitive_properties: Optional[List[str]] = None,
     outlet_static_state: Optional[FlowState] = None,
-    driver: Optional[Type[Any]] = None,  # type: ignore
-    save_path: Optional[str] = None
+    angle_of_attack: float = 0.0,
 ):
     config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(inlet_total_state, working_directory, id, outlet_static_state)
+    config = passage.get_config(inlet_total_state, working_directory, id, outlet_static_state, angle_of_attack)
     meshes = passage.get_mesh()
     if not isinstance(meshes, list):
         meshes = [meshes]
     setup_simulation(meshes, config, config_path)
-    remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, eval_properties, primitive_properties, outlet_static_state, driver)
+    remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, driver, eval_properties, primitive_properties, outlet_static_state)
     sim_results = ray.get(remote_result)
 
     if save_path:
