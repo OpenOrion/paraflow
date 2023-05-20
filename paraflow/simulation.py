@@ -116,7 +116,6 @@ def execute_su2(
     driver: Optional[Type[Any]],
     eval_properties: Optional[List[str]],
     primitive_properties: Optional[List[str]],
-    outlet_static_state: Optional[FlowState],
 ):
     import pysu2
     from mpi4py import MPI
@@ -126,7 +125,6 @@ def execute_su2(
 
     # Import mpi4py for parallel run
     comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
     num_zones = len(meshes)
     # Initialize the corresponding driver of SU2, this includes solver preprocessing
     SU2Driver: pysu2.CFluidDriver = driver(config_path, num_zones, comm)  # type: ignore
@@ -191,8 +189,7 @@ def execute_su2(
                         pressure = primitives(iVertex, primitiveIndices["PRESSURE"])
                         temperature = primitives(iVertex, primitiveIndices["TEMPERATURE"])
                         mach_number = get_mach_number(iVertex, primitives, primitiveIndices)
-
-                        target_values[target_name] = inlet_total_state.flasher.flash(T=temperature, P=pressure, mach_number=mach_number, radius=outlet_static_state.radius if outlet_static_state else None)
+                        target_values[target_name] = inlet_total_state.flasher.flash(T=temperature, P=pressure, mach_number=mach_number)
 
     # Output the solution to file
     SU2Driver.Output(0)
@@ -220,7 +217,7 @@ def run_simulation(
     if not isinstance(meshes, list):
         meshes = [meshes]
     setup_simulation(meshes, config, config_path)
-    remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, driver, eval_properties, primitive_properties, outlet_static_state)
+    remote_result = execute_su2.remote(meshes, config_path, inlet_total_state, driver, eval_properties, primitive_properties)
     sim_results = ray.get(remote_result)
 
     if save_path:

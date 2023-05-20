@@ -16,6 +16,7 @@ setup(
     "pymoo",
     "thermo",
     "ray[default]",
-    "matplotlib"
+    "matplotlib",
+    "plotly",
    ]
 )

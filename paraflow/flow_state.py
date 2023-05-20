@@ -17,9 +17,6 @@ class FlowState(EquilibriumState):
     mass_flow_rate: Optional[float] = None
     "mass flow rate (kg/s)"
 
-    radius: Optional[float] = None
-    "radius of flow passage (m)"
-
     absolute_angle: Optional[float] = None
     "absolute angle of flow (rad)"
 
@@ -30,25 +27,13 @@ class FlowState(EquilibriumState):
     "flasher object"
 
 
-    def __init__(self, T, P, zs, gas, liquids, solids, betas, mach_number=None, mass_flow_rate=None, absolute_angle=None, radius=None, translational_velocity=None, flash_specs=None, flash_convergence=None, constants=None, correlations=None, flasher=None, settings=...):
+    def __init__(self, T, P, zs, gas, liquids, solids, betas, mach_number=None, mass_flow_rate=None, absolute_angle=None, translational_velocity=None, flash_specs=None, flash_convergence=None, constants=None, correlations=None, flasher=None, settings=...):
         super().__init__(T, P, zs, gas, liquids, solids, betas, flash_specs, flash_convergence, constants, correlations, flasher, settings)
         self.mach_number = mach_number
         self.mass_flow_rate = mass_flow_rate
         self.absolute_angle = absolute_angle
-        self.radius = radius
         self.translation_velocity = translational_velocity
-
         self.gamma = cast(float, self.Cp_Cv_ratio())  # type: ignore
-        if self.radius:
-            self.flow_area = np.pi*self.radius**2
-            if self.mass_flow_rate and self.mach_number is None:
-                self.freestream_velocity = self.mass_flow_rate/(self.flow_area*self.rho_mass())
-                self.mach_number = self.freestream_velocity/self.speed_of_sound_mass()  # type: ignore
-            else:
-                self.mass_flow_rate = self.flow_area*self.freestream_velocity*self.rho_mass()
-        elif self.mass_flow_rate and self.radius is None:
-            self.flow_area = self.mass_flow_rate/(self.freestream_velocity*self.rho_mass())
-            self.radius = np.sqrt(self.flow_area/np.pi)
 
     @cached_property
     def gas_constant(self):
@@ -94,9 +79,9 @@ class FlowFlashPureVLS(FlashPureVLS):
     def __init__(self, constants, correlations, gas, liquids, solids, settings=default_settings):
         super().__init__(constants, correlations, gas, liquids, solids, settings)
 
-    def flash(self, mach_number=None, mass_flow_rate=None, absolute_angle=None, radius=None, translational_velocity=None, zs=None, T=None, P=None, VF=None, SF=None, V=None, H=None, S=None, G=None, U=None, A=None, solution=None, hot_start=None, retry=False, dest=None, rho=None, rho_mass=None, H_mass=None, S_mass=None, G_mass=None, U_mass=None, A_mass=None, spec_fun=None):
+    def flash(self, mach_number=None, mass_flow_rate=None, absolute_angle=None, translational_velocity=None, zs=None, T=None, P=None, VF=None, SF=None, V=None, H=None, S=None, G=None, U=None, A=None, solution=None, hot_start=None, retry=False, dest=None, rho=None, rho_mass=None, H_mass=None, S_mass=None, G_mass=None, U_mass=None, A_mass=None, spec_fun=None):
         eq_state = super().flash(zs, T, P, VF, SF, V, H, S, G, U, A, solution, hot_start, retry, dest, rho, rho_mass, H_mass, S_mass, G_mass, U_mass, A_mass, spec_fun)
-        flow_state =  FlowState(eq_state.T, eq_state.P, eq_state.zs, eq_state.gas, eq_state.liquids, eq_state.solids, eq_state.betas, mach_number, mass_flow_rate, absolute_angle, radius, translational_velocity, eq_state.flash_specs, eq_state.flash_convergence, eq_state.constants, eq_state.correlations, eq_state.flasher, eq_state.settings)
+        flow_state =  FlowState(eq_state.T, eq_state.P, eq_state.zs, eq_state.gas, eq_state.liquids, eq_state.solids, eq_state.betas, mach_number, mass_flow_rate, absolute_angle, translational_velocity, eq_state.flash_specs, eq_state.flash_convergence, eq_state.constants, eq_state.correlations, eq_state.flasher, eq_state.settings)
         flow_state.flasher = self
         return flow_state
 

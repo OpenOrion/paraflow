@@ -9,7 +9,7 @@ import json
 
 class Passage(Protocol):
     surface: PlaneSurface
-    def get_mesh(self) -> Union[Mesh | List[Mesh]]:  # type: ignore
+    def get_mesh(self) -> Union[Mesh, List[Mesh]]:  # type: ignore
         pass
 
     def visualize(self, title: str = "Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
