@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import multiprocessing
 import pickle
 from typing import List, Literal, Optional, Tuple, cast
@@ -12,8 +11,8 @@ from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
 from pymoo.core.problem import StarmapParallelization
-from paraflow.passages.symmetric import SymmetricPassage
-from paraflow.simulation import run_simulation
+from paraflow.simulation.simulation import run_simulation
+from paraflow.passages import SymmetricPassage, ConfigParameters
 
 MaxOrMin = Literal["max", "min"]
 n_proccess = 1
@@ -85,8 +84,10 @@ class PassageOptimizer(ElementwiseProblem):
 
             sim_results = run_simulation(
                 passage,
-                inlet_total_state=self.inlet_total_state,
-                outlet_static_state=self.outlet_static_state,
+                config_params=ConfigParameters(
+                    inlet_total_state=self.inlet_total_state,
+                    target_outlet_static_state=self.outlet_static_state,
+                ),
                 working_directory=self.working_directory,
                 id=f"{self.iteration}"
             )

@@ -11,3 +11,4 @@ git+https://github.com/Turbodesigner/pysu2.git#egg=pysu2
 mpi4py
 pymoo
 ray[default]
+vtk

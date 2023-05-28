@@ -18,5 +18,6 @@ setup(
     "ray[default]",
     "matplotlib",
     "plotly",
+    "vtk"
    ]
 )

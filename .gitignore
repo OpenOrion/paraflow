@@ -1,6 +1,8 @@
+turbExample/
+*.pkl
 *.pickle
 history.csv
-simulation/
+simulation_out/
 output/
 DIRECT/
 *.su2

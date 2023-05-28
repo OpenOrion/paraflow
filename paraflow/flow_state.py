@@ -20,20 +20,21 @@ class FlowState(EquilibriumState):
     absolute_angle: Optional[float] = None
     "absolute angle of flow (rad)"
 
-    translation_velocity: Optional[float] = None
+    linear_velocity: Optional[float] = None
     "translation velocity of flow passage (m/s)"
 
     flasher: "FlowFlashPureVLS"
     "flasher object"
 
 
-    def __init__(self, T, P, zs, gas, liquids, solids, betas, mach_number=None, mass_flow_rate=None, absolute_angle=None, translational_velocity=None, flash_specs=None, flash_convergence=None, constants=None, correlations=None, flasher=None, settings=...):
+    def __init__(self, T, P, zs, gas, liquids, solids, betas, mach_number=None, mass_flow_rate=None, absolute_angle=None, linear_velocity=None, flash_specs=None, flash_convergence=None, constants=None, correlations=None, flasher=None, settings=...):
         super().__init__(T, P, zs, gas, liquids, solids, betas, flash_specs, flash_convergence, constants, correlations, flasher, settings)
         self.mach_number = mach_number
         self.mass_flow_rate = mass_flow_rate
         self.absolute_angle = absolute_angle
-        self.translation_velocity = translational_velocity
+        self.linear_velocity = linear_velocity
         self.gamma = cast(float, self.Cp_Cv_ratio())  # type: ignore
+
 
     @cached_property
     def gas_constant(self):
@@ -62,7 +63,7 @@ class FlowState(EquilibriumState):
     @cached_property
     def realtive_tangential_velocity(self):
         "relative tangential flow velocity (m/s)"
-        return self.absolute_tangential_velocity - self.translation_velocity
+        return self.absolute_tangential_velocity - self.linear_velocity
 
     @cached_property
     def relative_angle(self):
