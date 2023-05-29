@@ -8,7 +8,7 @@ setup(
    description='the open source parametric passage flow generator',
    author='Afshawn Lotfi',
    author_email='',
-   packages=['paraflow', 'paraflow.passages'],
+   packages=['paraflow', 'paraflow.passages', 'paraflow.simulation'],
    install_requires=[
     "numpy",
     "scipy",
