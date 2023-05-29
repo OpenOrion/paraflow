@@ -19,12 +19,6 @@ def get_point_data(grid: vtk.vtkUnstructuredGrid, interp_points: npt.NDArray[np.
     """
     Get interpolated data for points_interpol using vtks built-in interpolation methods
     """
-    kernels = {
-        "linear": vtk.vtkLinearKernel(),
-        "shepard": vtk.vtkShepardKernel(),
-        "voronoi": vtk.vtkVoronoiKernel(),
-        "gaussian": vtk.vtkGaussianKernel(),
-    }
 
     temp_grid = vtk.vtkUnstructuredGrid()
     temp_grid_vtk_points = vtk.vtkPoints()
@@ -35,11 +29,10 @@ def get_point_data(grid: vtk.vtkUnstructuredGrid, interp_points: npt.NDArray[np.
     locator.SetDataSet(grid)
     locator.BuildLocator()
 
-    interpolator = vtk.vtkPointInterpolator()
+
+    interpolator = vtk.vtkProbeFilter()
     interpolator.SetInputData(temp_grid)
     interpolator.SetSourceData(grid)
-    interpolator.SetKernel(kernels[interpolation_method])
-    interpolator.SetLocator(locator)
     interpolator.Update()
 
     return interpolator.GetOutput().GetPointData()
