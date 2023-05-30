@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, Union, List
-from ezmesh import Mesh, PlaneSurface
+from ezmesh import Geometry, PlaneSurface
 from paraflow.flow_state import FlowState
 import json
 
@@ -26,6 +26,14 @@ class Passage(Protocol):
         id: str,
     ) -> Dict[str, Any]:  # type: ignore
         pass
+
+    def get_meshes(self):
+        meshes = []
+        for surface in self.surfaces:
+            with Geometry() as geo:
+                mesh = geo.generate(surface)
+                meshes.append(mesh)
+        return meshes
 
     def to_dict(self) -> Dict[str, Any]:  # type: ignore
         pass

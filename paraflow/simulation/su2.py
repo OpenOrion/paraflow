@@ -1,10 +1,21 @@
+# %%
 from dataclasses import dataclass
 import pathlib
-from typing import Any, Dict, List, Optional
-import ray
+import shutil
+from typing import Any, Dict, List
 from paraflow.simulation.output import SimulationResult, read_vtu_data
 from ezmesh.exporters import export_to_su2
+import pandas as pd
 from ezmesh import Mesh
+import subprocess
+import urllib.request 
+import zipfile
+import io
+import os
+import logging
+
+
+DEFAULT_INSTALL_DIR = f"{pathlib.Path.home()}/simulators/su2"
 
 @dataclass
 class SU2SimulationValues:
@@ -30,79 +41,43 @@ def setup_su2_simulation(
     export_to_su2(meshes, config['MESH_FILENAME'])
 
 
-def execute_su2_simulation(
-    config_path: str,
-    vtu_path: str,
-    eval_properties: Optional[List[str]],
-    num_zones: int = 1,
-):
-    import pysu2
-    from mpi4py import MPI
+def install_su2(install_dir: str = DEFAULT_INSTALL_DIR):
+    print(f"Downloading SU2 to {install_dir}")
+    if os.path.exists(install_dir):
+        shutil.rmtree(install_dir)
+    os.makedirs(install_dir)
 
-    # Initialize the corresponding driver of SU2, this includes solver preprocessing
-    driver = pysu2.CSinglezoneDriver if num_zones == 1 else pysu2.CMultizoneDriver
-    comm = MPI.COMM_WORLD
-    SU2Driver: pysu2.CFluidDriver = driver(config_path, num_zones, comm)  # type: ignore
-
-    # Time loop is defined in Python so that we have acces to SU2 functionalities at each time step
-    comm.Barrier()
-
-    # Time iteration preprocessing
-    SU2Driver.Preprocess(0)
-
-    # Run one time-step (static: one simulation)
-    SU2Driver.Run()
-
-    # Update the solver for the next time iteration
-    SU2Driver.Update()
-
-    # Monitor the solver and output solution to file if required
-    SU2Driver.Monitor(0)
-
-    eval_values: Dict[str, List[float]] = {}
-    for izone in range(num_zones):
-        # SU2Driver.SelectZone(izone) # TODO: coming soon in next pysu2
-        if eval_properties:
-            for eval_property in eval_properties:
-                if eval_property not in eval_values:
-                    eval_values[eval_property] = []
-                eval_value = SU2Driver.GetOutputValue(eval_property)
-                eval_values[eval_property].append(eval_value)
-
-    # Output the solution to file
-    SU2Driver.Output(0)
-
-    # Finalize the solver and exit cleanly
-    SU2Driver.Finalize()
-
-    return SU2SimulationValues(eval_values)
-
-
-@ray.remote
-def execute_su2_simulation_in_subprocess(
-    config_path: str,
-    vtu_path: str,
-    eval_properties: Optional[List[str]],
-    num_zones: int = 1,
-):
-    return execute_su2_simulation(config_path, vtu_path, eval_properties, num_zones)
-
+    url = "https://github.com/OpenOrion/su2_build/releases/download/7.5.1-python-3.10-bullseye-develop/build.zip"
+    with urllib.request.urlopen(url) as response:
+        with zipfile.ZipFile(io.BytesIO(response.read())) as zip_file:
+            for file_info in zip_file.infolist():
+                # Extract the file to the extract directory
+                if file_info.filename == "build/SU2_CFD/src/SU2_CFD":
+                    file_info.filename = file_info.filename.replace(f"build/SU2_CFD/src", "")
+                    zip_file.extract(file_info, install_dir)
+                    os.chmod(f"{install_dir}/SU2_CFD", 0o755)
 
 def run_su2_simulation(
     meshes: List[Mesh],
     config: Dict[str, Any],
     config_path: str,
-    eval_properties: Optional[List[str]] = None,
-    is_subprocess: bool = True,
+    install_dir: str = DEFAULT_INSTALL_DIR
 ):
+    print(f"Running SU2 Simulation for {config_path}")
 
-    vtu_path = config["VOLUME_FILENAME"]
+    executable_path = f"{install_dir}/SU2_CFD"
+    if not os.path.exists(executable_path):
+       install_su2(install_dir)
+
     setup_su2_simulation(meshes, config, config_path)
+    output = subprocess.run([f"{install_dir}/SU2_CFD", config_path], capture_output=True, text=True)
+    vtu = read_vtu_data(config["VOLUME_FILENAME"])
+    eval_values = pd.read_csv(config["CONV_FILENAME"])
 
-    if is_subprocess:
-        remote_result = execute_su2_simulation_in_subprocess.remote(config_path, vtu_path, eval_properties)
-        sim_values = ray.get(remote_result)
-    else:
-        sim_values = execute_su2_simulation(config_path, vtu_path, eval_properties)
-    vtu = read_vtu_data(vtu_path)
-    return SimulationResult(vtu, sim_values.eval_values)
+    return SimulationResult(vtu, eval_values)
+
+
+
+
+
+# %%

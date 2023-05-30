@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import pickle
-from typing import Dict, List
+import pandas as pd
 import vtk
 
 
@@ -33,7 +33,7 @@ class SimulationResult:
     grid: vtk.vtkUnstructuredGrid
     "vtu unsctructured grid"
 
-    eval_values: Dict[str, List[float]]
+    eval_values: pd.DataFrame
     "values for provided eval attributes"
 
     @staticmethod
