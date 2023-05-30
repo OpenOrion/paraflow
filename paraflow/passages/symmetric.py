@@ -41,16 +41,6 @@ class SymetricPassageMeshParams:
     symmetry_label: str = "symmetry"
     "label for symmetry"
 
-    target_top_outflow_label: str = "target_top_outflow"
-    "label for target top outflow"
-
-    target_mid_outflow_label: str = "target_mid_outflow"
-    "label for target mid outflow"
-
-    target_bottom_outflow_label: str = "target_bottom_outflow"
-    "label for target bottom outflow"
-
-
 @dataclass
 class SymmetricPassage(Passage):
     axial_length: float

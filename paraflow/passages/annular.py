@@ -21,9 +21,6 @@ class AnnularPassageMeshParams:
     outflow_label: str = "outflow"
     "label for outflow"
 
-    target_mid_outflow_label: str = "target_mid_outflow"
-    "label for target mid outflow"
-
 
 @dataclass
 class AnnularPassage(Passage):

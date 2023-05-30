@@ -1,4 +1,3 @@
-# %%
 from dataclasses import dataclass
 import pathlib
 import shutil
@@ -12,8 +11,6 @@ import urllib.request
 import zipfile
 import io
 import os
-import logging
-
 
 DEFAULT_INSTALL_DIR = f"{pathlib.Path.home()}/simulators/su2"
 
@@ -75,9 +72,3 @@ def run_su2_simulation(
     eval_values = pd.read_csv(config["CONV_FILENAME"])
 
     return SimulationResult(vtu, eval_values)
-
-
-
-
-
-# %%

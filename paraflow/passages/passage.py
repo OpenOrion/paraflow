@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, Union, List
-from ezmesh import Geometry, PlaneSurface
+from ezmesh import Geometry, PlaneSurface, Mesh
 from paraflow.flow_state import FlowState
 import json
 
@@ -28,7 +28,7 @@ class Passage(Protocol):
         pass
 
     def get_meshes(self):
-        meshes = []
+        meshes: List[Mesh] = []
         for surface in self.surfaces:
             with Geometry() as geo:
                 mesh = geo.generate(surface)
