@@ -1,29 +1,39 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, Union, List
-from ezmesh import Mesh, PlaneSurface
+from ezmesh import Geometry, PlaneSurface, Mesh
 from paraflow.flow_state import FlowState
 import json
 
 
+@dataclass
+class ConfigParameters:
+    inlet_total_state: FlowState
+    target_outlet_static_state: Optional[FlowState] = None
+    angle_of_attack: float = 0.0
 
 
 class Passage(Protocol):
-    surface: PlaneSurface
-    def get_mesh(self) -> Union[Mesh | List[Mesh]]:  # type: ignore
-        pass
+    surfaces: List[PlaneSurface]
+    "surfaces of passage"
 
     def visualize(self, title: str = "Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         pass
 
     def get_config(
-            self, 
-            inlet_total_state: FlowState, 
-            working_directory: str, 
-            id: str,
-            target_outlet_static_state: Optional[FlowState] = None,
-            angle_of_attack: Optional[float] = 0.0,
-        ) -> Dict[str, Any]:  # type: ignore
+        self,
+        config_params: ConfigParameters,
+        working_directory: str,
+        id: str,
+    ) -> Dict[str, Any]:  # type: ignore
         pass
+
+    def get_meshes(self):
+        meshes: List[Mesh] = []
+        for surface in self.surfaces:
+            with Geometry() as geo:
+                mesh = geo.generate(surface)
+                meshes.append(mesh)
+        return meshes
 
     def to_dict(self) -> Dict[str, Any]:  # type: ignore
         pass

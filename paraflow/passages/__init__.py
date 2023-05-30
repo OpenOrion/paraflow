@@ -1,3 +1,3 @@
 from .symmetric import SymmetricPassage
 from .annular import AnnularPassage
-from .passage import Passage
+from .passage import Passage, ConfigParameters

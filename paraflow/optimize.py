@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import multiprocessing
 import pickle
 from typing import List, Literal, Optional, Tuple, cast
@@ -12,8 +11,10 @@ from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
 from pymoo.core.problem import StarmapParallelization
-from paraflow.passages.symmetric import SymmetricPassage
-from paraflow.simulation import run_simulation
+from paraflow.simulation.postprocessing import get_point_data
+from paraflow.simulation.simulation import run_simulation
+from paraflow.passages import SymmetricPassage, ConfigParameters
+from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
 MaxOrMin = Literal["max", "min"]
 n_proccess = 1
@@ -79,14 +80,19 @@ class PassageOptimizer(ElementwiseProblem):
                 contour_props=contour_props.tolist(),
                 contour_angles=contour_angles.tolist(),
             )
+
+            mesh = passage.get_meshes()[0]
+            mid_outflow_point = mesh.get_marker_point(passage.mesh_params.outflow_label, 0.5)
             passage.write(f"{self.working_directory}/passage{self.iteration}.json")
 
             assert (passage.ctrl_pnts[:, 1] > 0).all()
 
             sim_results = run_simulation(
                 passage,
-                inlet_total_state=self.inlet_total_state,
-                outlet_static_state=self.outlet_static_state,
+                config_params=ConfigParameters(
+                    inlet_total_state=self.inlet_total_state,
+                    target_outlet_static_state=self.outlet_static_state,
+                ),
                 working_directory=self.working_directory,
                 id=f"{self.iteration}"
             )
@@ -95,7 +101,11 @@ class PassageOptimizer(ElementwiseProblem):
             for obj, direction in self.objectives:
                 sign = -1 if direction == "max" else 1
                 if obj == "mach":
-                    obj_val = cast(float, sim_results.target_values["mid_outflow"].mach_number)
+                    target_value_point_data = get_point_data(sim_results.grid, interp_points=np.array([
+                        mid_outflow_point
+                    ]))
+                    target_values = vtk_to_numpy(target_value_point_data.GetArray("Mach"))
+                    obj_val = cast(float, target_values[0])
                 else:
                     raise ValueError(f"Unknown objective {obj}")
                 objectives.append(sign * obj_val)

@@ -12,8 +12,8 @@ passage = SymmetricPassage(
 )
 
 flasher = get_flasher("Octamethyltrisiloxane", "gas")
-inlet_total_state = flasher.flash(P=904388, T=542.13, mach_number=1E-9, radius=passage.inlet_radius)
-target_outlet_static_state = flasher.flash(P=200000, T=293.15, mass_flow_rate=inlet_total_state.mass_flow_rate, radius=passage.outlet_radius)
+inlet_total_state = flasher.flash(P=904388, T=542.13, mach_number=1E-9)
+target_outlet_static_state = flasher.flash(P=200000, T=293.15, mass_flow_rate=inlet_total_state.mass_flow_rate)
 PassageOptimizer(
     "/workspaces/paraflow/simulation",
     inlet_total_state,

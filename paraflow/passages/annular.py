@@ -2,9 +2,8 @@ from dataclasses import asdict, dataclass, field
 from functools import cached_property
 from typing import Any, Dict, Optional
 import plotly.graph_objects as go
-from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
-from paraflow.flow_state import FlowState
-from paraflow.passages.passage import Passage
+from ezmesh import CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
+from paraflow.passages.passage import Passage, ConfigParameters
 from paraflow.passages.symmetric import SymmetricPassage
 
 
@@ -21,9 +20,6 @@ class AnnularPassageMeshParams:
 
     outflow_label: str = "outflow"
     "label for outflow"
-
-    target_mid_outflow_label: str = "target_mid_outflow"
-    "label for target mid outflow"
 
 
 @dataclass
@@ -61,7 +57,7 @@ class AnnularPassage(Passage):
         )
 
     @cached_property
-    def surface(self):
+    def surfaces(self):
         curve_loop = CurveLoop.from_coords(
             [
                 ("BSpline", self.shroud_passage.ctrl_pnts),
@@ -77,19 +73,13 @@ class AnnularPassage(Passage):
             ]
         )
 
-        return PlaneSurface(
+        return [PlaneSurface(
             outlines=[curve_loop],
             is_quad_mesh=True,
             fields=[
                 TransfiniteSurfaceField(corners=curve_loop.get_points("wall"))
             ],
-        )
-
-    def get_mesh(self):
-        with Geometry() as geo:
-            mesh = geo.generate(self.surface)
-            mesh.add_target_point(self.mesh_params.target_mid_outflow_label, self.mesh_params.outflow_label, 0.5)
-            return mesh
+        )]
 
     def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         fig = go.Figure(layout=go.Layout(title=go.layout.Title(text=title)))
@@ -114,14 +104,13 @@ class AnnularPassage(Passage):
             fig.show()
 
     def get_config(
-            self, 
-            inlet_total_state: FlowState, 
-            working_directory: str, id: str, 
-            target_outlet_static_state: FlowState, 
-            angle_of_attack: float = 0.0
-        ):
-        self.mesh_params.symmetry_label = None # type: ignore
-        config = SymmetricPassage.get_config(self, inlet_total_state, working_directory, id, target_outlet_static_state, angle_of_attack) # type: ignore
+        self,
+        config_params: ConfigParameters,
+        working_directory: str,
+        id: str,
+    ):
+        self.mesh_params.symmetry_label = None  # type: ignore
+        config = SymmetricPassage.get_config(self, config_params, working_directory, id)  # type: ignore
         del config["MARKER_SYM"]
         return config
 

@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_state import FlowState
-from paraflow.passages.passage import Passage
+from paraflow.passages.passage import Passage, ConfigParameters
 
 
 def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
@@ -22,6 +22,7 @@ def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
         constant_values=(0, 1)
     )
     return BSpline(knots, ctrl_pnts, degree, extrapolate=False)
+
 
 @dataclass
 class SymetricPassageMeshParams:
@@ -39,17 +40,6 @@ class SymetricPassageMeshParams:
 
     symmetry_label: str = "symmetry"
     "label for symmetry"
-
-    target_top_outflow_label: str = "target_top_outflow"
-    "label for target top outflow"
-
-    target_mid_outflow_label: str = "target_mid_outflow"
-    "label for target mid outflow"
-
-    target_bottom_outflow_label: str = "target_bottom_outflow"
-    "label for target bottom outflow"
-
-    
 
 @dataclass
 class SymmetricPassage(Passage):
@@ -122,7 +112,7 @@ class SymmetricPassage(Passage):
         return contour_bspline(np.linspace(0, 1, num_points))
 
     @cached_property
-    def surface(self):
+    def surfaces(self):
         curve_loop = CurveLoop.from_coords(
             [
                 ("BSpline", self.ctrl_pnts),
@@ -138,22 +128,15 @@ class SymmetricPassage(Passage):
             ]
         )
 
-        return PlaneSurface(
-            outlines=[curve_loop],
-            is_quad_mesh=True,
-            fields=[
-                TransfiniteSurfaceField(corners=[*curve_loop.get_points(self.mesh_params.wall_label), *curve_loop.get_points(self.mesh_params.symmetry_label)])
-            ],
-        )
-
-
-    def get_mesh(self):
-        with Geometry() as geo:
-            mesh = geo.generate(self.surface)
-            mesh.add_target_point(self.mesh_params.target_top_outflow_label, self.mesh_params.outflow_label, 0)
-            mesh.add_target_point(self.mesh_params.target_mid_outflow_label, self.mesh_params.outflow_label, 0.5)
-            mesh.add_target_point(self.mesh_params.target_bottom_outflow_label, self.mesh_params.outflow_label, 1.0)
-            return mesh
+        return [
+            PlaneSurface(
+                outlines=[curve_loop],
+                is_quad_mesh=True,
+                fields=[
+                    TransfiniteSurfaceField(corners=[*curve_loop.get_points(self.mesh_params.wall_label), *curve_loop.get_points(self.mesh_params.symmetry_label)])
+                ],
+            )
+        ]
 
     def visualize(self, title: str = "Flow Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         fig = go.Figure(layout=go.Layout(title=go.layout.Title(text=title)))
@@ -173,40 +156,39 @@ class SymmetricPassage(Passage):
             fig.show()
 
     def get_config(
-            self, 
-            inlet_total_state: FlowState, 
-            working_directory: str, 
-            id: str, 
-            target_outlet_static_state: FlowState,
-            angle_of_attack: float = 0.0
-        ):
+        self,
+        config_params: ConfigParameters,
+        working_directory: str,
+        id: str,
+    ):
+        assert config_params.target_outlet_static_state is not None, "must specify target outlet static state"
         return {
             "SOLVER": "RANS",
             "KIND_TURB_MODEL": "SST",
             "MATH_PROBLEM": "DIRECT",
             "RESTART_SOL": "NO",
             "SYSTEM_MEASUREMENTS": "SI",
-            "MACH_NUMBER": inlet_total_state.mach_number,
-            "AOA": angle_of_attack,
+            "MACH_NUMBER": config_params.inlet_total_state.mach_number,
+            "AOA": config_params.angle_of_attack,
             "SIDESLIP_ANGLE": 0.0,
             "INIT_OPTION": "TD_CONDITIONS",
             "FREESTREAM_OPTION": "TEMPERATURE_FS",
-            "FREESTREAM_PRESSURE": inlet_total_state.P,
-            "FREESTREAM_TEMPERATURE": inlet_total_state.T,
+            "FREESTREAM_PRESSURE": config_params.inlet_total_state.P,
+            "FREESTREAM_TEMPERATURE": config_params.inlet_total_state.T,
             "REF_DIMENSIONALIZATION": "DIMENSIONAL",
             "FLUID_MODEL": "PR_GAS",
-            "GAMMA_VALUE": inlet_total_state.gamma,
-            "GAS_CONSTANT": inlet_total_state.gas_constant,
-            "CRITICAL_TEMPERATURE": inlet_total_state.pseudo_Tc(),
-            "CRITICAL_PRESSURE": inlet_total_state.pseudo_Pc(),
-            "ACENTRIC_FACTOR": inlet_total_state.pseudo_omega(),
+            "GAMMA_VALUE": config_params.inlet_total_state.gamma,
+            "GAS_CONSTANT": config_params.inlet_total_state.gas_constant,
+            "CRITICAL_TEMPERATURE": config_params.inlet_total_state.pseudo_Tc(),
+            "CRITICAL_PRESSURE": config_params.inlet_total_state.pseudo_Pc(),
+            "ACENTRIC_FACTOR": config_params.inlet_total_state.pseudo_omega(),
             "VISCOSITY_MODEL": "CONSTANT_VISCOSITY",
-            "MU_CONSTANT": inlet_total_state.mu(),                                  # type: ignore
+            "MU_CONSTANT": config_params.inlet_total_state.mu(),                                  # type: ignore
             "CONDUCTIVITY_MODEL": "CONSTANT_CONDUCTIVITY",
-            "THERMAL_CONDUCTIVITY_CONSTANT": inlet_total_state.k(),                 # type: ignore
+            "THERMAL_CONDUCTIVITY_CONSTANT": config_params.inlet_total_state.k(),                 # type: ignore
             "MARKER_HEATFLUX": "( wall, 0.0 )",
             "MARKER_SYM": self.mesh_params.symmetry_label,
-            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {inlet_total_state.P}, {inlet_total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {target_outlet_static_state.P}, 0.0, 0.0, 0.0, 0.0 )",
+            "MARKER_RIEMANN": f"( inflow, TOTAL_CONDITIONS_PT, {config_params.inlet_total_state.P}, {config_params.inlet_total_state.T}, 1.0, 0.0, 0.0, outflow, STATIC_PRESSURE, {config_params.target_outlet_static_state.P}, 0.0, 0.0, 0.0, 0.0 )",
             "NUM_METHOD_GRAD": "GREEN_GAUSS",
             "CFL_NUMBER": 1.0,
             "CFL_ADAPT": "YES",
@@ -233,10 +215,10 @@ class SymmetricPassage(Passage):
             "MESH_FILENAME": f"{working_directory}/passage{id}.su2",
             "MESH_FORMAT": "SU2",
             "TABULAR_FORMAT": "CSV",
-            "VOLUME_FILENAME": f"{working_directory}/flow{id}",
+            "VOLUME_FILENAME": f"{working_directory}/flow{id}.vtu",
             "RESTART_FILENAME":  f"{working_directory}/restart_flow{id}.dat",
-            "SURFACE_FILENAME":  f"{working_directory}/surface_flow{id}",
-            "CONV_FILENAME": f"{working_directory}/history{id}",
+            "SURFACE_FILENAME":  f"{working_directory}/surface_flow{id}.vtu",
+            "CONV_FILENAME": f"{working_directory}/history{id}.csv",
             "OUTPUT_WRT_FREQ": 1000,
             "SCREEN_OUTPUT": "(INNER_ITER, RMS_DENSITY, RMS_TKE, RMS_DISSIPATION, LIFT, DRAG)",
         }
