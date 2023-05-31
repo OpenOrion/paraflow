@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import pickle
 import pandas as pd
+import gzip
 import vtk
 
 
@@ -38,7 +39,7 @@ class SimulationResult:
 
     @staticmethod
     def from_file(file_path: str) -> "SimulationResult":
-        with open(file_path, 'rb') as handle:
+        with gzip.open(file_path, 'rb') as handle:
             deserialized_dict = pickle.load(handle)
             deserialized_vtu = deserialize_vtu(deserialized_dict["vtu"])
             return SimulationResult(
@@ -48,7 +49,7 @@ class SimulationResult:
 
     def to_file(self, file_path: str):
         serialized_vtu = serialize_vtu(self.grid)
-        with open(file_path, 'wb') as handle:
+        with gzip.open(file_path, 'wb') as handle:
             pickle.dump(
                 obj={
                     "vtu": serialized_vtu,
