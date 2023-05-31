@@ -14,16 +14,6 @@ def get_points(grid: vtk.vtkUnstructuredGrid):
     vtk_points = grid.GetPoints()
     return vtk_to_numpy(vtk_points.GetData())
 
-
-def get_target_data(grid: vtk.vtkUnstructuredGrid, mesh: Mesh):
-    target_points = []
-    for target_point_group in mesh.target_points.values():
-        for target_point_element in target_point_group.keys():
-            target_points.append(mesh.points[target_point_element])
-    target_value_point_data = get_point_data(grid, interp_points=np.array(target_points))
-    target_values = vtk_to_numpy(target_value_point_data.GetArray("Mach"))
-
-
 def get_point_data(grid: vtk.vtkUnstructuredGrid, interp_points: npt.NDArray[np.float64]):
     """
     Get interpolated data for points_interpol using vtks built-in interpolation methods
