@@ -11,6 +11,7 @@ import urllib.request
 import zipfile
 import io
 import os
+import vtk
 
 DEFAULT_INSTALL_DIR = f"{pathlib.Path.home()}/simulators/su2"
 
@@ -23,16 +24,15 @@ def setup_su2_simulation(
     config: Dict,
     config_path: str,
 ):
-    config_path_directory = pathlib.Path(config_path).parent
     with open(config_path, "w") as fp_config:
         for key, value in config.items():
             if key == "CONFIG_LIST":
                 assert isinstance(value, dict)
                 for zone_config_save_path, zone_config_dict in value.items():
-                    with open(f"{config_path_directory}/{zone_config_save_path}", "w") as fp_zone_config:
+                    with open(zone_config_save_path, "w") as fp_zone_config:
                         for zone_config_key, zone_config_value in zone_config_dict.items():
                             fp_zone_config.write(f"{zone_config_key}= {zone_config_value}\n")
-                fp_config.write(f"CONFIG_LIST= ({','.join(f'{config_path_directory}/{zone_config_path}' for zone_config_path in value.keys())})\n")
+                fp_config.write(f"CONFIG_LIST= ({','.join(zone_config_path for zone_config_path in value.keys())})\n")
             else:
                 fp_config.write(f"{key}= {value}\n")
     export_to_su2(meshes, config['MESH_FILENAME'])
@@ -54,21 +54,56 @@ def install_su2(install_dir: str = DEFAULT_INSTALL_DIR):
                     zip_file.extract(file_info, install_dir)
                     os.chmod(f"{install_dir}/SU2_CFD", 0o755)
 
+def delete_output_files(
+    config: Dict[str, Any],
+    config_path: str,
+    num_zones: int
+):
+    for key, value in config.items():
+        if key == "CONFIG_LIST":
+            for config_file in value.keys():
+                os.remove(config_file)
+        if key.endswith("FILENAME"):
+            if num_zones > 1 and key not in ["CONV_FILENAME", "MESH_FILENAME"]:
+                try:
+                    for i in range(num_zones):
+                        filename = value.replace(".", f"_{i}.")
+                        os.remove(filename)
+                except Exception as e:
+                    print(e)
+            else:
+                os.remove(value)
+    os.remove(config_path)
+
 def run_su2_simulation(
     meshes: List[Mesh],
     config: Dict[str, Any],
     config_path: str,
-    install_dir: str = DEFAULT_INSTALL_DIR
+    auto_delete: bool = True,
+    install_dir: str = DEFAULT_INSTALL_DIR,
 ):
     print(f"Running SU2 Simulation for {config_path}")
-
+    num_zones=len(meshes)
     executable_path = f"{install_dir}/SU2_CFD"
     if not os.path.exists(executable_path):
        install_su2(install_dir)
 
     setup_su2_simulation(meshes, config, config_path)
     output = subprocess.run([f"{install_dir}/SU2_CFD", config_path], capture_output=True, text=True)
-    vtu = read_vtu_data(config["VOLUME_FILENAME"])
+    if output.stderr:
+        raise Exception(output.stderr)
+    grids: List[vtk.vtkUnstructuredGrid] = []
+    for i in range(num_zones):
+        
+        vtu_filename = config["VOLUME_FILENAME"]
+        if num_zones > 1:
+            vtu_filename = vtu_filename.replace(".", f"_{i}.")
+
+        grids += [read_vtu_data(vtu_filename)]
     eval_values = pd.read_csv(config["CONV_FILENAME"])
 
-    return SimulationResult(vtu, eval_values)
+
+    if auto_delete:
+        delete_output_files(config, config_path, num_zones)
+
+    return SimulationResult(grids, eval_values)

@@ -17,12 +17,6 @@ def run_simulation(
 
     if sim_type == 'su2':
         from paraflow.simulation.su2 import run_su2_simulation
-        sim_results = run_su2_simulation(meshes, config, config_path)
-
-    if auto_delete:
-        for key, value in config.items():
-            if key.endswith("FILENAME"):
-                os.remove(value)
-        os.remove(config_path)
+        sim_results = run_su2_simulation(meshes, config, config_path, auto_delete)
 
     return sim_results
