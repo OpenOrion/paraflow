@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 import pickle
+from typing import List
 import pandas as pd
 import gzip
 import vtk
 
 
-def read_vtu_data(filename: str):
+def read_vtu_data(filename: str) -> vtk.vtkUnstructuredGrid:
     reader = vtk.vtkXMLUnstructuredGridReader()
     reader.SetFileName(filename)
     reader.Update()
@@ -31,7 +32,7 @@ def deserialize_vtu(vtu_str: str):
 
 @dataclass
 class SimulationResult:
-    grid: vtk.vtkUnstructuredGrid
+    grids: List[vtk.vtkUnstructuredGrid]
     "vtu unsctructured grid"
 
     eval_values: pd.DataFrame
@@ -41,18 +42,18 @@ class SimulationResult:
     def from_file(file_path: str) -> "SimulationResult":
         with gzip.open(file_path, 'rb') as handle:
             deserialized_dict = pickle.load(handle)
-            deserialized_vtu = deserialize_vtu(deserialized_dict["vtu"])
+            deserialized_grids = [deserialize_vtu(grid) for grid in deserialized_dict["grids"]]
             return SimulationResult(
-                grid=deserialized_vtu,
+                grids=deserialized_grids,
                 eval_values=deserialized_dict["eval_values"]
             )
 
     def to_file(self, file_path: str):
-        serialized_vtu = serialize_vtu(self.grid)
+        serialized_grids = [serialize_vtu(grid) for grid in self.grids]
         with gzip.open(file_path, 'wb') as handle:
             pickle.dump(
                 obj={
-                    "vtu": serialized_vtu,
+                    "grids": serialized_grids,
                     "eval_values": self.eval_values
                 },
                 file=handle,
