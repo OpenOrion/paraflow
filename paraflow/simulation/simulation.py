@@ -12,6 +12,7 @@ def run_simulation(
     verbose: bool = False,
     simulator_config: Dict = {}
 ):
+    working_directory = os.path.abspath(working_directory)
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
     config_path = f"{working_directory}/config{id}.cfg"
