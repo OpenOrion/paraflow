@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 import pathlib
 import shutil
-from typing import Any, Dict, List
+import sys
+from typing import Any, Dict, List, Optional
 from paraflow.simulation.output import SimulationResult, read_vtu_data
 from ezmesh.exporters import export_to_su2
 import pandas as pd
@@ -14,6 +15,18 @@ import os
 import vtk
 
 DEFAULT_INSTALL_DIR = f"{pathlib.Path.home()}/simulators/su2"
+DEFAULT_VERSION = "7.5.1"
+
+def get_platform():
+    if sys.platform.startswith('darwin'):
+        return "macos"
+    elif sys.platform.startswith('win'):
+        return "win "
+    elif sys.platform.startswith('linux'):
+        return "linux"
+    else:
+        raise Exception(f"Unsupported platform {sys.platform}")
+
 
 @dataclass
 class SU2SimulationValues:
@@ -38,27 +51,28 @@ def setup_su2_simulation(
     export_to_su2(meshes, config['MESH_FILENAME'])
 
 
-def install_su2(install_dir: str = DEFAULT_INSTALL_DIR):
-    print(f"Downloading SU2 to {install_dir}")
+def install_su2(url: str, install_dir: str, executable_name: str = "SU2_CFD"):
     if os.path.exists(install_dir):
         shutil.rmtree(install_dir)
     os.makedirs(install_dir)
 
-    url = "https://github.com/OpenOrion/su2_build/releases/download/7.5.1-python-3.10-bullseye-develop/build.zip"
+    print(f"Downloading SU2 from {url} to {install_dir}/{executable_name}")
+    
     with urllib.request.urlopen(url) as response:
         with zipfile.ZipFile(io.BytesIO(response.read())) as zip_file:
             for file_info in zip_file.infolist():
                 # Extract the file to the extract directory
-                if file_info.filename == "build/SU2_CFD/src/SU2_CFD":
-                    file_info.filename = file_info.filename.replace(f"build/SU2_CFD/src", "")
+                if file_info.filename == "bin/SU2_CFD":
+                    file_info.filename = executable_name
                     zip_file.extract(file_info, install_dir)
-                    os.chmod(f"{install_dir}/SU2_CFD", 0o755)
+                    os.chmod(f"{install_dir}/{executable_name}", 0o755)
 
 def delete_output_files(
     config: Dict[str, Any],
     config_path: str,
     num_zones: int
 ):
+    print(f"Cleaning up ..")
     for key, value in config.items():
         if key == "CONFIG_LIST":
             for config_file in value.keys():
@@ -80,16 +94,34 @@ def run_su2_simulation(
     config: Dict[str, Any],
     config_path: str,
     auto_delete: bool = True,
+    verbose: bool = False,
     install_dir: str = DEFAULT_INSTALL_DIR,
+    version: str = DEFAULT_VERSION,
+    is_mpi: bool = False,
+    custom_download_url: Optional[str] = None,
 ):
-    print(f"Running SU2 Simulation for {config_path}")
     num_zones=len(meshes)
-    executable_path = f"{install_dir}/SU2_CFD"
-    if not os.path.exists(executable_path):
-       install_su2(install_dir)
 
+    platform = get_platform()
+    if custom_download_url:
+        url = custom_download_url
+    else:
+        url = f"https://github.com/su2code/SU2/releases/download/v{version}/SU2-v{version}-{platform}64{'-mpi' if is_mpi else ''}.zip"
+    executable_name = url.split("/")[-1].replace(".zip", "")
+    executable_path = f"{install_dir}/{executable_name}"
+    
+    if not os.path.exists(executable_path):
+        install_su2(url, install_dir, executable_name)
+
+    print(f"Setting up SU2 Simulation for {config_path}")
     setup_su2_simulation(meshes, config, config_path)
-    output = subprocess.run([f"{install_dir}/SU2_CFD", config_path], capture_output=True, text=True)
+
+    print(f"Running SU2 Simulation for {config_path}")
+    output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
+
+    if verbose:
+        print(output.stdout)
+
     if output.stderr:
         raise Exception(output.stderr)
     grids: List[vtk.vtkUnstructuredGrid] = []
@@ -102,7 +134,7 @@ def run_su2_simulation(
         grids += [read_vtu_data(vtu_filename)]
     eval_values = pd.read_csv(config["CONV_FILENAME"])
 
-
+    
     if auto_delete:
         delete_output_files(config, config_path, num_zones)
 
