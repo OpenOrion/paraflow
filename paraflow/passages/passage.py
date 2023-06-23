@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol, Union, List
+from typing import Any, Dict, Optional, Protocol, List
 from ezmesh import Geometry, PlaneSurface, Mesh
+import numpy.typing as npt
 from paraflow.flow_state import FlowState
 import json
 
@@ -10,7 +11,7 @@ class ConfigParameters:
     inlet_total_state: FlowState
     target_outlet_static_state: Optional[FlowState] = None
     angle_of_attack: float = 0.0
-
+    translation: Optional[List[Optional[npt.NDArray]]] = None
 
 class Passage(Protocol):
     surfaces: List[PlaneSurface]
