@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import pickle
-from typing import List
+from typing import List, Optional
 import pandas as pd
 import gzip
 import vtk
@@ -38,6 +38,9 @@ class SimulationResult:
     eval_values: pd.DataFrame
     "values for provided eval attributes"
 
+    log_output: Optional[str] = None
+    "log output from simulation"
+
     @staticmethod
     def from_file(file_path: str) -> "SimulationResult":
         with gzip.open(file_path, 'rb') as handle:
@@ -45,7 +48,8 @@ class SimulationResult:
             deserialized_grids = [deserialize_vtu(grid) for grid in deserialized_dict["grids"]]
             return SimulationResult(
                 grids=deserialized_grids,
-                eval_values=deserialized_dict["eval_values"]
+                eval_values=deserialized_dict["eval_values"],
+                log_output=deserialized_dict["log_output"]
             )
 
     def to_file(self, file_path: str):
@@ -54,7 +58,8 @@ class SimulationResult:
             pickle.dump(
                 obj={
                     "grids": serialized_grids,
-                    "eval_values": self.eval_values
+                    "eval_values": self.eval_values,
+                    "log_output": self.log_output
                 },
                 file=handle,
                 protocol=pickle.HIGHEST_PROTOCOL

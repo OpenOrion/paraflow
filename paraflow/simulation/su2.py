@@ -119,8 +119,9 @@ def run_su2_simulation(
     print(f"Running SU2 Simulation for {config_path}")
     output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
 
+    log_output = output.stdout
     if verbose:
-        print(output.stdout)
+        print(log_output)
 
     if output.stderr:
         raise Exception(output.stderr)
@@ -138,4 +139,4 @@ def run_su2_simulation(
     if auto_delete:
         delete_output_files(config, config_path, num_zones)
 
-    return SimulationResult(grids, eval_values)
+    return SimulationResult(grids, eval_values, log_output)

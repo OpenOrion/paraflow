@@ -17,9 +17,9 @@ from paraflow.passages import SymmetricPassage, ConfigParameters
 from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
 MaxOrMin = Literal["max", "min"]
-n_proccess = 1
-pool = multiprocessing.Pool(n_proccess)
-runner = StarmapParallelization(pool.starmap)
+# n_proccess = 1
+# pool = multiprocessing.Pool(n_proccess)
+# runner = StarmapParallelization(pool.starmap)
 
 
 class PassageOptimizer(ElementwiseProblem):
