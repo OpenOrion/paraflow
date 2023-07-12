@@ -13,13 +13,13 @@ from pymoo.optimize import minimize
 from pymoo.core.problem import StarmapParallelization
 from paraflow.simulation.postprocessing import get_point_data
 from paraflow.simulation.simulation import run_simulation
-from paraflow.passages import SymmetricPassage, ConfigParameters
+from paraflow.passages import SymmetricPassage, SimulationOptions
 from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
 MaxOrMin = Literal["max", "min"]
-n_proccess = 1
-pool = multiprocessing.Pool(n_proccess)
-runner = StarmapParallelization(pool.starmap)
+# n_proccess = 1
+# pool = multiprocessing.Pool(n_proccess)
+# runner = StarmapParallelization(pool.starmap)
 
 
 class PassageOptimizer(ElementwiseProblem):
@@ -89,7 +89,7 @@ class PassageOptimizer(ElementwiseProblem):
 
             sim_results = run_simulation(
                 passage,
-                config_params=ConfigParameters(
+                config_params=SimulationOptions(
                     inlet_total_state=self.inlet_total_state,
                     target_outlet_static_state=self.outlet_static_state,
                 ),

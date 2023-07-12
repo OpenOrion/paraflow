@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_state import FlowState
-from paraflow.passages.passage import Passage, ConfigParameters
+from paraflow.passages.passage import Passage, SimulationOptions
 
 
 def get_bspline(ctrl_pnts: npt.NDArray, degree: int):
@@ -111,8 +111,7 @@ class SymmetricPassage(Passage):
         contour_bspline = get_bspline(self.ctrl_pnts, 3)
         return contour_bspline(np.linspace(0, 1, num_points))
 
-    @cached_property
-    def surfaces(self):
+    def get_surfaces(self, sim_options: Optional[SimulationOptions] = None):
         curve_loop = CurveLoop.from_coords(
             [
                 ("BSpline", self.ctrl_pnts),
@@ -157,7 +156,7 @@ class SymmetricPassage(Passage):
 
     def get_config(
         self,
-        config_params: ConfigParameters,
+        config_params: SimulationOptions,
         working_directory: str,
         id: str,
     ):

@@ -1,10 +1,10 @@
 import os
 from typing import Dict, Literal
-from paraflow.passages.passage import Passage, ConfigParameters
+from paraflow.passages.passage import Passage, SimulationOptions
 
 def run_simulation(
     passage: Passage,
-    config_params: ConfigParameters,
+    sim_options: SimulationOptions,
     working_directory: str,
     id: str,
     sim_type: Literal['su2'] = 'su2',
@@ -16,9 +16,9 @@ def run_simulation(
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
     config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(config_params, working_directory, id)
+    config = passage.get_config(sim_options, working_directory, id)
 
-    meshes = passage.get_meshes()
+    meshes = passage.get_meshes(sim_options)
 
     if sim_type == 'su2':
         from paraflow.simulation.su2 import run_su2_simulation

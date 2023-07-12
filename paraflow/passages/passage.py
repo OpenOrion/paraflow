@@ -7,30 +7,30 @@ import json
 
 
 @dataclass
-class ConfigParameters:
+class SimulationOptions:
     inlet_total_state: FlowState
     target_outlet_static_state: Optional[FlowState] = None
     angle_of_attack: float = 0.0
     translation: Optional[List[Optional[npt.NDArray]]] = None
 
 class Passage(Protocol):
-    surfaces: List[PlaneSurface]
-    "surfaces of passage"
-
     def visualize(self, title: str = "Passage", include_ctrl_pnts=False, show=True, save_path: Optional[str] = None):
         pass
 
     def get_config(
         self,
-        config_params: ConfigParameters,
+        sim_options: SimulationOptions,
         working_directory: str,
         id: str,
     ) -> Dict[str, Any]:  # type: ignore
         pass
 
-    def get_meshes(self):
+    def get_surfaces(self, sim_options: Optional[SimulationOptions] = None) -> List[PlaneSurface]:
+        pass
+
+    def get_meshes(self, sim_options: Optional[SimulationOptions] = None):
         meshes: List[Mesh] = []
-        for surface in self.surfaces:
+        for surface in self.get_surfaces(sim_options):
             with Geometry() as geo:
                 mesh = geo.generate(surface)
                 meshes.append(mesh)

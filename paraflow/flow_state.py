@@ -31,7 +31,15 @@ class FlowState(EquilibriumState):
         "freestream velocity (m/s)"
         return self.mach_number*self.speed_of_sound_mass()  # type: ignore
 
-
+    def to_static_state(self, abs_angle: Optional[float] = None):
+        if abs_angle is None:
+            abs_velocity = self.freestream_velocity
+        else:
+            abs_velocity = self.freestream_velocity/np.cos(abs_angle)
+        static_temperature = self.T - (abs_velocity**2)/(2*self.Cp_mass())
+        static_pressure = self.P*(static_temperature/self.T)**(self.gamma/(self.gamma - 1))
+        return self.flasher.flash(P=static_pressure, T=static_temperature, mach_number=self.mach_number)
+      
 class FlowFlashPureVLS(FlashPureVLS):
     def __init__(self, constants, correlations, gas, liquids, solids, settings=default_settings):
         super().__init__(constants, correlations, gas, liquids, solids, settings)
@@ -41,6 +49,8 @@ class FlowFlashPureVLS(FlashPureVLS):
         flow_state =  FlowState(eq_state.T, eq_state.P, eq_state.zs, eq_state.gas, eq_state.liquids, eq_state.solids, eq_state.betas, mach_number, eq_state.flash_specs, eq_state.flash_convergence, eq_state.constants, eq_state.correlations, eq_state.flasher, eq_state.settings)
         flow_state.flasher = self
         return flow_state
+
+
 
 @lru_cache(maxsize=None)
 def get_flasher(
@@ -61,3 +71,4 @@ def get_flasher(
             gas = CEOSGas(SRKMIX, HeatCapacityGases=correlations.HeatCapacityGases, eos_kwargs=eos_kwargs)
 
     return FlowFlashPureVLS(constants=constants, correlations=correlations, gas=gas, liquids=liquid, solids=[])
+

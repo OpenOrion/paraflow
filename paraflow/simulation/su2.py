@@ -99,19 +99,24 @@ def run_su2_simulation(
     version: str = DEFAULT_VERSION,
     is_mpi: bool = False,
     custom_download_url: Optional[str] = None,
+    custom_executable_path: Optional[str] = None
 ):
     num_zones=len(meshes)
 
     platform = get_platform()
-    if custom_download_url:
-        url = custom_download_url
-    else:
-        url = f"https://github.com/su2code/SU2/releases/download/v{version}/SU2-v{version}-{platform}64{'-mpi' if is_mpi else ''}.zip"
-    executable_name = url.split("/")[-1].replace(".zip", "")
-    executable_path = f"{install_dir}/{executable_name}"
     
-    if not os.path.exists(executable_path):
-        install_su2(url, install_dir, executable_name)
+    if custom_executable_path:
+        executable_path = custom_executable_path
+    else:
+        if custom_download_url:
+            url = custom_download_url
+        else:
+            url = f"https://github.com/su2code/SU2/releases/download/v{version}/SU2-v{version}-{platform}64{'-mpi' if is_mpi else ''}.zip"
+        executable_name = url.split("/")[-1].replace(".zip", "")
+        executable_path = f"{install_dir}/{executable_name}"
+    
+        if not os.path.exists(executable_path):
+            install_su2(url, install_dir, executable_name)
 
     print(f"Setting up SU2 Simulation for {config_path}")
     setup_su2_simulation(meshes, config, config_path)
@@ -119,8 +124,9 @@ def run_su2_simulation(
     print(f"Running SU2 Simulation for {config_path}")
     output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
 
+    log_output = output.stdout
     if verbose:
-        print(output.stdout)
+        print(log_output)
 
     if output.stderr:
         raise Exception(output.stderr)
@@ -138,4 +144,4 @@ def run_su2_simulation(
     if auto_delete:
         delete_output_files(config, config_path, num_zones)
 
-    return SimulationResult(grids, eval_values)
+    return SimulationResult(grids, eval_values, log_output)
