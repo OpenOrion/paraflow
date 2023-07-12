@@ -39,7 +39,7 @@ class FlowState(EquilibriumState):
         static_temperature = self.T - (abs_velocity**2)/(2*self.Cp_mass())
         static_pressure = self.P*(static_temperature/self.T)**(self.gamma/(self.gamma - 1))
         return self.flasher.flash(P=static_pressure, T=static_temperature, mach_number=self.mach_number)
-
+      
 class FlowFlashPureVLS(FlashPureVLS):
     def __init__(self, constants, correlations, gas, liquids, solids, settings=default_settings):
         super().__init__(constants, correlations, gas, liquids, solids, settings)
