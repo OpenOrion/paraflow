@@ -95,12 +95,14 @@ def run_su2_simulation(
     config_path: str,
     auto_delete: bool = True,
     verbose: bool = False,
+    num_procs: int = 1,
     install_dir: str = DEFAULT_INSTALL_DIR,
     version: str = DEFAULT_VERSION,
-    is_mpi: bool = False,
     custom_download_url: Optional[str] = None,
+    custom_mpirun_path: Optional[str] = None,
     custom_executable_path: Optional[str] = None
 ):
+    is_mpi = num_procs > 1
     num_zones=len(meshes)
 
     platform = get_platform()
@@ -122,8 +124,14 @@ def run_su2_simulation(
     setup_su2_simulation(meshes, config, config_path)
 
     print(f"Running SU2 Simulation for {config_path}")
-    output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
+    if is_mpi:
+        mpi_cmd = custom_mpirun_path or 'mpirun'
+        # output = os.system(f"{mpi_cmd} -n {num_procs} {executable_path} {config_path}")    
+        output = subprocess.run([mpi_cmd, "-n", f"{num_procs}", executable_path, config_path], capture_output=True, text=True)    
+    else:
+        output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
 
+    log_output = ""
     log_output = output.stdout
     if verbose:
         print(log_output)
