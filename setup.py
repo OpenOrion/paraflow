@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
    name='paraflow',
-   version='2.3',
+   version='3.0.0',
    description='the open source parametric passage flow generator',
    author='Afshawn Lotfi',
    author_email='',
