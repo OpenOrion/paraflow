@@ -107,7 +107,6 @@ def run_su2_simulation(
     num_zones=len(meshes)
 
     platform = get_platform()
-    
     if custom_executable_path:
         executable_path = custom_executable_path
     else:
@@ -130,7 +129,7 @@ def run_su2_simulation(
     else:
         output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
 
-    log_output = ""
+
     log_output = output.stdout
     if verbose:
         print(log_output)
