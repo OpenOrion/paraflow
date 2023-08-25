@@ -95,26 +95,27 @@ def run_su2_simulation(
     config_path: str,
     auto_delete: bool = True,
     verbose: bool = False,
+    num_procs: int = 1,
     install_dir: str = DEFAULT_INSTALL_DIR,
     version: str = DEFAULT_VERSION,
-    is_mpi: bool = False,
     custom_download_url: Optional[str] = None,
+    custom_repo_url: str = f"https://github.com/su2code/SU2",
+    custom_mpirun_path: Optional[str] = None,
     custom_executable_path: Optional[str] = None
 ):
+    is_mpi = num_procs > 1
     num_zones=len(meshes)
 
     platform = get_platform()
-    
     if custom_executable_path:
         executable_path = custom_executable_path
     else:
         if custom_download_url:
             url = custom_download_url
         else:
-            url = f"https://github.com/su2code/SU2/releases/download/v{version}/SU2-v{version}-{platform}64{'-mpi' if is_mpi else ''}.zip"
+            url = f"{custom_repo_url}/releases/download/v{version}/SU2-v{version}-{platform}64{'-mpi' if is_mpi else ''}.zip"
         executable_name = url.split("/")[-1].replace(".zip", "")
         executable_path = f"{install_dir}/{executable_name}"
-    
         if not os.path.exists(executable_path):
             install_su2(url, install_dir, executable_name)
 
@@ -122,7 +123,12 @@ def run_su2_simulation(
     setup_su2_simulation(meshes, config, config_path)
 
     print(f"Running SU2 Simulation for {config_path}")
-    output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
+    if is_mpi:
+        mpi_cmd = custom_mpirun_path or 'mpirun'
+        output = subprocess.run([mpi_cmd, "-n", f"{num_procs}", executable_path, config_path], capture_output=True, text=True)    
+    else:
+        output = subprocess.run([executable_path, config_path], capture_output=True, text=True)
+
 
     log_output = output.stdout
     if verbose:

@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
    name='paraflow',
-   version='2.2.5',
+   version='3.0.0',
    description='the open source parametric passage flow generator',
    author='Afshawn Lotfi',
    author_email='',
@@ -12,7 +12,7 @@ setup(
    install_requires=[
     "numpy",
     "scipy",
-    "ezmesh @ git+https://github.com/Turbodesigner/ezmesh.git",
+    "ezmesh @ git+https://github.com/Turbodesigner/ezmesh.git@3.6.0",
     "pymoo",
     "thermo",
     "matplotlib",
