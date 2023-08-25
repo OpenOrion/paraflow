@@ -12,7 +12,7 @@ setup(
    install_requires=[
     "numpy",
     "scipy",
-    "ezmesh @ git+https://github.com/Turbodesigner/ezmesh.git",
+    "ezmesh @ git+https://github.com/Turbodesigner/ezmesh.git@3.6.0",
     "pymoo",
     "thermo",
     "matplotlib",
