@@ -9,7 +9,7 @@
         <img src="https://img.shields.io/discord/913193916885524552?logo=discord"
             alt="chat on Discord">
     </a>
-    <a href="https://www.patreon.com/turbodesigner">
+    <a href="https://www.patreon.com/openorion">
         <img src="https://img.shields.io/badge/dynamic/json?color=%23e85b46&label=Patreon&query=data.attributes.patron_count&suffix=%20patrons&url=https%3A%2F%2Fwww.patreon.com%2Fapi%2Fcampaigns%2F9860430"
             alt="donate to Patreon">
     </a>
@@ -23,7 +23,7 @@ ParaFlow is a declarative tool that parametrically generates turbomachinery flow
 
 # Install
 ```
-pip install git+https://github.com/Turbodesigner/paraflow.git#egg=paraflow
+pip install git+https://github.com/OpenOrion/paraflow.git#egg=paraflow
 ```
 
 # Example
@@ -54,7 +54,7 @@ Rocket Nozzle Simulation Example
 
 # Devlopement Setup
 ```
-git clone https://github.com/Turbodesigner/paraflow.git
+git clone https://github.com/OpenOrion/paraflow.git
 cd paraflow
 pip install -r requirements_dev.txt
 ```
