@@ -1,3 +1,3 @@
 from .symmetric import SymmetricPassage
 from .annular import AnnularPassage
-from .passage import Passage, SimulationOptions
+from .passage import Passage, SimulationParams

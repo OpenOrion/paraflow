@@ -2,7 +2,8 @@ from dataclasses import dataclass
 import pathlib
 import shutil
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
+from paraflow.passages.passage import Passage, SimulationParams
 from paraflow.simulation.output import SimulationResult, read_vtu_data
 from ezmesh.exporters import export_to_su2
 import pandas as pd
@@ -14,19 +15,10 @@ import io
 import os
 import vtk
 
+from paraflow.simulation.platform import PlatformType, get_platform
+
 DEFAULT_INSTALL_DIR = f"{pathlib.Path.home()}/simulators/su2"
 DEFAULT_VERSION = "7.5.1"
-
-def get_platform():
-    if sys.platform.startswith('darwin'):
-        return "macos"
-    elif sys.platform.startswith('win'):
-        return "win "
-    elif sys.platform.startswith('linux'):
-        return "linux"
-    else:
-        raise Exception(f"Unsupported platform {sys.platform}")
-
 
 @dataclass
 class SU2SimulationValues:
@@ -36,7 +28,9 @@ def setup_su2_simulation(
     meshes: List[Mesh],
     config: Dict,
     config_path: str,
+    platform: PlatformType
 ):
+    newline = "\r" if platform == "win" else "\n"
     with open(config_path, "w") as fp_config:
         for key, value in config.items():
             if key == "CONFIG_LIST":
@@ -44,14 +38,14 @@ def setup_su2_simulation(
                 for zone_config_save_path, zone_config_dict in value.items():
                     with open(zone_config_save_path, "w") as fp_zone_config:
                         for zone_config_key, zone_config_value in zone_config_dict.items():
-                            fp_zone_config.write(f"{zone_config_key}= {zone_config_value}\n")
-                fp_config.write(f"CONFIG_LIST= ({','.join(zone_config_path for zone_config_path in value.keys())})\n")
+                            fp_zone_config.write(f"{zone_config_key}= {zone_config_value}{newline}")
+                fp_config.write(f"CONFIG_LIST= ({','.join(zone_config_path for zone_config_path in value.keys())}){newline}")
             else:
-                fp_config.write(f"{key}= {value}\n")
+                fp_config.write(f"{key}= {value}{newline}")
     export_to_su2(meshes, config['MESH_FILENAME'])
 
 
-def install_su2(url: str, install_dir: str, executable_name: str = "SU2_CFD"):
+def install_su2(url: str, install_dir: str, platform: PlatformType, executable_name: str = "SU2_CFD"):
     if os.path.exists(install_dir):
         shutil.rmtree(install_dir)
     os.makedirs(install_dir)
@@ -62,10 +56,11 @@ def install_su2(url: str, install_dir: str, executable_name: str = "SU2_CFD"):
         with zipfile.ZipFile(io.BytesIO(response.read())) as zip_file:
             for file_info in zip_file.infolist():
                 # Extract the file to the extract directory
-                if file_info.filename == "bin/SU2_CFD":
+                if platform != "win" and file_info.filename == "bin/SU2_CFD" or platform == "win" and file_info.filename == "bin/SU2_CFD.exe":
                     file_info.filename = executable_name
                     zip_file.extract(file_info, install_dir)
-                    os.chmod(f"{install_dir}/{executable_name}", 0o755)
+                    if platform != "win":
+                        os.chmod(f"{install_dir}/{executable_name}", 0o755)
 
 def delete_output_files(
     config: Dict[str, Any],
@@ -89,42 +84,58 @@ def delete_output_files(
                 os.remove(value)
     os.remove(config_path)
 
+@dataclass
+class Su2SimulationConfig:
+    install_dir: str = DEFAULT_INSTALL_DIR
+    version: str = DEFAULT_VERSION
+    custom_download_url: Optional[str] = None
+    custom_repo_url: str = f"https://github.com/su2code/SU2"
+    custom_mpirun_path: Optional[str] = None
+    custom_executable_path: Optional[str] = None
+
 def run_su2_simulation(
-    meshes: List[Mesh],
-    config: Dict[str, Any],
-    config_path: str,
+    passage: Passage,
+    params: SimulationParams,
+    working_directory: str,
+    id: str,
     auto_delete: bool = True,
     verbose: bool = False,
     num_procs: int = 1,
-    install_dir: str = DEFAULT_INSTALL_DIR,
-    version: str = DEFAULT_VERSION,
-    custom_download_url: Optional[str] = None,
-    custom_repo_url: str = f"https://github.com/su2code/SU2",
-    custom_mpirun_path: Optional[str] = None,
-    custom_executable_path: Optional[str] = None
+    cfg: Su2SimulationConfig = Su2SimulationConfig(),
 ):
+    platform = get_platform()
+    su2_cfg_directory = working_directory
+    if platform == "win":
+        su2_cfg_directory = working_directory.replace("c:/", "/").replace("\\", "/")
+
+    if not os.path.exists(working_directory):
+        os.makedirs(working_directory)
+    config_path = f"{working_directory}/config{id}.cfg"
+    config = passage.get_config(params, working_directory, id)
+
+    meshes = passage.get_meshes(params)
+
     is_mpi = num_procs > 1
     num_zones=len(meshes)
 
-    platform = get_platform()
-    if custom_executable_path:
-        executable_path = custom_executable_path
+    if cfg.custom_executable_path:
+        executable_path = cfg.custom_executable_path
     else:
-        if custom_download_url:
-            url = custom_download_url
+        if cfg.custom_download_url:
+            url = cfg.custom_download_url
         else:
-            url = f"{custom_repo_url}/releases/download/v{version}/SU2-v{version}-{platform}64{'-mpi' if is_mpi else ''}.zip"
+            url = f"{cfg.custom_repo_url}/releases/download/v{cfg.version}/SU2-v{cfg.version}-{platform}64{'-mpi' if is_mpi else ''}.zip"
         executable_name = url.split("/")[-1].replace(".zip", "")
-        executable_path = f"{install_dir}/{executable_name}"
+        executable_path = f"{cfg.install_dir}/{executable_name}"
         if not os.path.exists(executable_path):
-            install_su2(url, install_dir, executable_name)
+            install_su2(url, cfg.install_dir, platform, executable_name)
 
     print(f"Setting up SU2 Simulation for {config_path}")
-    setup_su2_simulation(meshes, config, config_path)
+    setup_su2_simulation(meshes, config, config_path, platform)
 
     print(f"Running SU2 Simulation for {config_path}")
     if is_mpi:
-        mpi_cmd = custom_mpirun_path or 'mpirun'
+        mpi_cmd = cfg.custom_mpirun_path or 'mpirun'
         output = subprocess.run([mpi_cmd, "-n", f"{num_procs}", executable_path, config_path], capture_output=True, text=True)    
     else:
         output = subprocess.run([executable_path, config_path], capture_output=True, text=True)

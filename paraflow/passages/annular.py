@@ -3,7 +3,7 @@ from functools import cached_property
 from typing import Any, Dict, Optional
 import plotly.graph_objects as go
 from ezmesh import CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
-from paraflow.passages.passage import Passage, SimulationOptions
+from paraflow.passages.passage import Passage, SimulationParams
 from paraflow.passages.symmetric import SymmetricPassage
 
 
@@ -56,7 +56,7 @@ class AnnularPassage(Passage):
             contour_angles=[self.shroud_angle, self.shroud_angle],
         )
 
-    def get_surfaces(self, sim_options: Optional[SimulationOptions] = None):
+    def get_surfaces(self, params: Optional[SimulationParams] = None):
         curve_loop = CurveLoop.from_coords(
             [
                 ("BSpline", self.shroud_passage.ctrl_pnts),
@@ -104,12 +104,12 @@ class AnnularPassage(Passage):
 
     def get_config(
         self,
-        sim_options: SimulationOptions,
+        params: SimulationParams,
         working_directory: str,
         id: str,
     ):
         self.mesh_params.symmetry_label = None  # type: ignore
-        config = SymmetricPassage.get_config(self, sim_options, working_directory, id)  # type: ignore
+        config = SymmetricPassage.get_config(self, params, working_directory, id)  # type: ignore
         del config["MARKER_SYM"]
         return config
 

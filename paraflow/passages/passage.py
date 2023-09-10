@@ -7,7 +7,7 @@ import json
 
 
 @dataclass
-class SimulationOptions:
+class SimulationParams:
     inlet_total_state: FlowState
     target_outlet_static_state: Optional[FlowState] = None
     angle_of_attack: float = 0.0
@@ -19,25 +19,25 @@ class Passage(Protocol):
 
     def get_config(
         self,
-        sim_options: SimulationOptions,
+        params: SimulationParams,
         working_directory: str,
         id: str,
     ) -> Dict[str, Any]:  # type: ignore
         pass
 
-    def get_surfaces(self, sim_options: Optional[SimulationOptions] = None) -> List[PlaneSurface]:
-        pass
+    def get_surfaces(self, params: Optional[SimulationParams] = None) -> List[PlaneSurface]:
+        ...
 
-    def get_meshes(self, sim_options: Optional[SimulationOptions] = None):
+    def get_meshes(self, params: Optional[SimulationParams] = None):
         meshes: List[Mesh] = []
-        for surface in self.get_surfaces(sim_options):
+        for surface in self.get_surfaces(params):
             with Geometry() as geo:
                 mesh = geo.generate(surface)
                 meshes.append(mesh)
         return meshes
 
     def to_dict(self) -> Dict[str, Any]:  # type: ignore
-        pass
+        ...
 
     def write(self, path: str):
         with open(path, "w") as f:
