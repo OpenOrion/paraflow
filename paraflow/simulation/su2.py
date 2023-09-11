@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import pathlib
 import shutil
-import sys
 from typing import Any, Dict, List, Optional, Literal
 from paraflow.passages.passage import Passage, SimulationParams
 from paraflow.simulation.output import SimulationResult, read_vtu_data
@@ -30,7 +29,6 @@ def setup_su2_simulation(
     config_path: str,
     platform: PlatformType
 ):
-    newline = "\r" if platform == "win" else "\n"
     with open(config_path, "w") as fp_config:
         for key, value in config.items():
             if key == "CONFIG_LIST":
@@ -38,10 +36,10 @@ def setup_su2_simulation(
                 for zone_config_save_path, zone_config_dict in value.items():
                     with open(zone_config_save_path, "w") as fp_zone_config:
                         for zone_config_key, zone_config_value in zone_config_dict.items():
-                            fp_zone_config.write(f"{zone_config_key}= {zone_config_value}{newline}")
-                fp_config.write(f"CONFIG_LIST= ({','.join(zone_config_path for zone_config_path in value.keys())}){newline}")
+                            fp_zone_config.write(f"{zone_config_key}= {zone_config_value}\n")
+                fp_config.write(f"CONFIG_LIST= ({','.join(zone_config_path for zone_config_path in value.keys())})\n")
             else:
-                fp_config.write(f"{key}= {value}{newline}")
+                fp_config.write(f"{key}= {value}\n")
     export_to_su2(meshes, config['MESH_FILENAME'])
 
 
@@ -106,12 +104,12 @@ def run_su2_simulation(
     platform = get_platform()
     su2_cfg_directory = working_directory
     if platform == "win":
-        su2_cfg_directory = working_directory.replace("c:/", "/").replace("\\", "/")
+        su2_cfg_directory = working_directory.replace("c:\\", "/").replace("\\", "/")
 
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
     config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(params, working_directory, id)
+    config = passage.get_config(params, su2_cfg_directory, id)
 
     meshes = passage.get_meshes(params)
 
