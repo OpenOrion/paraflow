@@ -7,7 +7,6 @@ import plotly.graph_objects as go
 from scipy.interpolate import BSpline
 import numpy as np
 import numpy.typing as npt
-from ezmesh import Geometry, CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.flow_state import FlowState
 from paraflow.passages.passage import Passage, SimulationOptions
 
@@ -112,6 +111,8 @@ class SymmetricPassage(Passage):
         return contour_bspline(np.linspace(0, 1, num_points))
 
     def get_surfaces(self, sim_options: Optional[SimulationOptions] = None):
+        from ezmesh import CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
+
         curve_loop = CurveLoop.from_coords(
             [
                 ("BSpline", self.ctrl_pnts),

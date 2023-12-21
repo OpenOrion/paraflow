@@ -4,9 +4,8 @@ import shutil
 import sys
 from typing import Any, Dict, List, Optional
 from paraflow.simulation.output import SimulationResult, read_vtu_data
-from ezmesh.exporters import export_to_su2
+
 import pandas as pd
-from ezmesh import Mesh
 import subprocess
 import urllib.request 
 import zipfile
@@ -33,10 +32,12 @@ class SU2SimulationValues:
     eval_values: Dict[str, List[float]]
 
 def setup_su2_simulation(
-    meshes: List[Mesh],
+    meshes: list,
     config: Dict,
     config_path: str,
 ):
+    from ezmesh.exporters import export_to_su2
+
     with open(config_path, "w") as fp_config:
         for key, value in config.items():
             if key == "CONFIG_LIST":
@@ -90,7 +91,7 @@ def delete_output_files(
     os.remove(config_path)
 
 def run_su2_simulation(
-    meshes: List[Mesh],
+    meshes: list,
     config: Dict[str, Any],
     config_path: str,
     auto_delete: bool = True,
