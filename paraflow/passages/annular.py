@@ -2,7 +2,6 @@ from dataclasses import asdict, dataclass, field
 from functools import cached_property
 from typing import Any, Dict, Optional
 import plotly.graph_objects as go
-from ezmesh import CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
 from paraflow.passages.passage import Passage, SimulationOptions
 from paraflow.passages.symmetric import SymmetricPassage
 
@@ -57,6 +56,8 @@ class AnnularPassage(Passage):
         )
 
     def get_surfaces(self, sim_options: Optional[SimulationOptions] = None):
+        from ezmesh import CurveLoop, PlaneSurface, TransfiniteCurveField, TransfiniteSurfaceField
+
         curve_loop = CurveLoop.from_coords(
             [
                 ("BSpline", self.shroud_passage.ctrl_pnts),
