@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, List
-from ezmesh import Geometry, PlaneSurface, Mesh
 import numpy.typing as npt
 from paraflow.flow_state import FlowState
 import json
@@ -25,10 +24,12 @@ class Passage(Protocol):
     ) -> Dict[str, Any]:  # type: ignore
         pass
 
-    def get_surfaces(self, sim_options: Optional[SimulationOptions] = None) -> List[PlaneSurface]:
-        pass
+    def get_surfaces(self, sim_options: Optional[SimulationOptions] = None) -> list:
+        ...
 
     def get_meshes(self, sim_options: Optional[SimulationOptions] = None):
+        from ezmesh import Geometry, Mesh
+
         meshes: List[Mesh] = []
         for surface in self.get_surfaces(sim_options):
             with Geometry() as geo:
