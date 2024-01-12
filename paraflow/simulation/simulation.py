@@ -1,28 +1,23 @@
 import os
-from typing import Dict, Literal
-from paraflow.passages.passage import Passage, SimulationOptions
+from paraflow.passages.passage import Passage, SimulationParams
+from paraflow.simulation.su2 import Su2SimulationConfig
 
 def run_simulation(
     passage: Passage,
-    sim_options: SimulationOptions,
+    params: SimulationParams,
     working_directory: str,
     id: str,
-    sim_type: Literal['su2'] = 'su2',
     auto_delete: bool = True,
     verbose: bool = False,
     num_procs: int = 1,
-    sim_config: Dict = {}
+    cfg: Su2SimulationConfig = Su2SimulationConfig()
 ):
     working_directory = os.path.abspath(working_directory)
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
-    config_path = f"{working_directory}/config{id}.cfg"
-    config = passage.get_config(sim_options, working_directory, id)
 
-    meshes = passage.get_meshes(sim_options)
-
-    if sim_type == 'su2':
+    if isinstance(cfg, Su2SimulationConfig):
         from paraflow.simulation.su2 import run_su2_simulation
-        sim_results = run_su2_simulation(meshes, config, config_path, auto_delete, verbose, num_procs, **sim_config)
+        sim_results = run_su2_simulation(passage, params, working_directory, id, auto_delete, verbose, num_procs, cfg)
 
     return sim_results
