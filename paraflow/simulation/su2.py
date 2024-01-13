@@ -13,6 +13,7 @@ import zipfile
 import io
 import os
 import vtk
+import re
 
 from paraflow.simulation.platform import PlatformType, get_platform
 
@@ -104,7 +105,11 @@ def run_su2_simulation(
     platform = get_platform()
     su2_cfg_directory = working_directory
     if platform == "win":
-        su2_cfg_directory = working_directory.replace("c:\\", "/").replace("\\", "/")
+        # remove C:\\ and use forward slashes
+        regex = r"(.*):\\(.*)"
+        path_match = re.match(regex, su2_cfg_directory)
+        assert path_match, "Invalid working directory"
+        su2_cfg_directory = path_match.group(2).replace("\\", "/")
 
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
