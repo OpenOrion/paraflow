@@ -6,6 +6,6 @@ matplotlib
 numpy
 scipy
 thermo
-git+https://github.com/Turbodesigner/ezmesh.git@3.6.0#egg=ezmesh
+git+https://github.com/OpenOrion/ezmesh.git@3.6.5#egg=ezmesh
 pymoo
 vtk
