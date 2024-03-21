@@ -127,7 +127,7 @@ def run_su2_simulation(
         if cfg.custom_download_url:
             url = cfg.custom_download_url
         else:
-            url = f"{cfg.custom_repo_url}/releases/download/v{cfg.version}-turbo-{platform}64{'-mpi' if is_mpi else ''}/SU2-{cfg.version}-turbo-{platform}64{'-mpi' if is_mpi else ''}.zip"
+            url = f"{cfg.custom_repo_url}/releases/download/v{cfg.version}-turbo-{platform}64{'-mpi' if is_mpi else ''}/SU2-v{cfg.version}-turbo-{platform}64{'-mpi' if is_mpi else ''}.zip"
         executable_name = url.split("/")[-1].replace(".zip", "")
         executable_path = f"{cfg.install_dir}/{executable_name}"
         if not os.path.exists(executable_path):
