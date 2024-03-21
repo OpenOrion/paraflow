@@ -35,6 +35,9 @@ def get_point_data(grid: vtk.vtkUnstructuredGrid, interp_points: npt.NDArray[np.
 
     return interpolator.GetOutput().GetPointData()
 
+def export_paraview(sim_result: SimulationResult):
+    sim_result.grids
+    print('check')
 
 @dataclass
 class DataFrame:
